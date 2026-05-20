@@ -49,7 +49,23 @@ def code_files() -> list[Path]:
         if "__pycache__" not in path.parts:
             files.append(path)
 
-    for rel in [".env", ".env.dev", ".gitignore", "extract_body.json", "extract_test_body.json"]:
+    for path in sorted((ROOT / "app" / "static").glob("*")):
+        if path.suffix in {".html", ".js", ".css", ".svg"}:
+            files.append(path)
+
+    for path in sorted((ROOT / "scripts").glob("*.sql")):
+        files.append(path)
+
+    for path in sorted((ROOT / "docs").glob("*.md")):
+        files.append(path)
+
+    for rel in [
+        ".env.dev",
+        ".env.example",
+        ".gitignore",
+        "samples/extract_body.json",
+        "samples/extract_test_body.json",
+    ]:
         p = ROOT / rel
         if p.exists():
             files.append(p)
@@ -86,22 +102,35 @@ def main() -> None:
 
     document.add_heading("1.1 Objetivo", level=2)
     document.add_paragraph(
-        "Proveer una API para definir configuraciones de extraccion y ejecutar "
-        "extracciones estructuradas de datos desde texto de documentos usando LLM."
+        "Proveer un flujo completo para extraccion de datos de facturas y documentos: "
+        "configuracion de prompts, extraccion asistida por LLM, validacion humana, "
+        "procesamiento en lote mediante colecciones y exportacion de resultados."
     )
 
     document.add_heading("1.2 Casos de uso cubiertos", level=2)
     document.add_paragraph("- Crear configuraciones de extraccion (POST /prompt-configs/).")
     document.add_paragraph("- Listar configuraciones existentes (GET /prompt-configs/).")
     document.add_paragraph("- Ejecutar extraccion real con config persistida (POST /extract/).")
+    document.add_paragraph("- Guardar extracciones ligadas a una coleccion (collection_id opcional en POST /extract/).")
+    document.add_paragraph("- Crear y listar colecciones para procesamiento batch (POST /collections/, GET /collections/).")
+    document.add_paragraph("- Consultar extracciones por coleccion (GET /collections/{collection_id}/extractions).")
+    document.add_paragraph("- Exportar colecciones a Excel (GET /collections/{collection_id}/export/xlsx).")
+    document.add_paragraph("- Exportar extracciones por filtros en csv/xlsx/json (GET /extractions/export/bulk).")
+    document.add_paragraph("- Exportar extraccion individual a Excel (GET /extractions/{id}/export/xlsx).")
     document.add_paragraph("- Probar extraccion con variables ad hoc (POST /extract-test/).")
     document.add_paragraph("- Ver prompt final de referencia (GET /test-template/).")
 
     document.add_heading("1.3 Estado validado", level=2)
     document.add_paragraph("- GET /prompt-configs/ -> 200 OK")
     document.add_paragraph("- POST /prompt-configs/ -> 201 Created")
+    document.add_paragraph("- GET /collections/?limit=5 -> 200 OK")
+    document.add_paragraph("- GET /extractions/?limit=5 -> 200 OK")
+    document.add_paragraph("- GET /health -> 200 OK")
     document.add_paragraph(
         "- Conexion a Supabase estable mediante Session Pooler en entorno actual"
+    )
+    document.add_paragraph(
+        "- Flujo UI validado: Nueva extraccion + Colecciones + Historial + exportaciones"
     )
 
     document.add_page_break()
@@ -118,12 +147,18 @@ def main() -> None:
     document.add_paragraph("- Pydantic v2")
     document.add_paragraph("- httpx async")
     document.add_paragraph("- OpenAI Chat Completions")
+    document.add_paragraph("- python-docx (generacion de esta documentacion)")
+    document.add_paragraph("- openpyxl (exportacion XLSX)")
+    document.add_paragraph("- Frontend vanilla: HTML + CSS + JavaScript")
 
     document.add_heading("2.2 Flujo tecnico resumido", level=2)
     document.add_paragraph("1) Carga de entorno en app/config.py con load_dotenv(override=True).")
     document.add_paragraph("2) Creacion de engine async y sesiones en app/db/connection.py.")
     document.add_paragraph("3) Routers FastAPI registrados en app/main.py.")
     document.add_paragraph("4) Extraccion via servicios de template, LLM y validador.")
+    document.add_paragraph("5) Soporte de colecciones en BD (tabla collections + FK collection_id en extractions).")
+    document.add_paragraph("6) Exportaciones: individual XLSX, bulk CSV/XLSX/JSON y XLSX por coleccion.")
+    document.add_paragraph("7) Frontend con vista Colecciones para procesamiento batch desde multiples archivos.")
 
     document.add_heading("2.3 Codigo y configuracion completa", level=2)
     document.add_paragraph(

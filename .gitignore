@@ -2,3 +2,6 @@
 venv/
 __pycache__/
 *.pyc
+
+# Artefactos locales/generados
+*.db
