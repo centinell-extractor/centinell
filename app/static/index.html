@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Centinell Console</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v=20260520b">
+  <link rel="stylesheet" href="/static/styles.css?v=20260520b">
+</head>
+<body>
+  <div class="bg-shape bg-shape-a"></div>
+  <div class="bg-shape bg-shape-b"></div>
+
+  <header class="topbar">
+    <div>
+      <h1>Centinell Console</h1>
+      <p>Extraccion inteligente con validacion humana</p>
+    </div>
+    <div class="status-chip is-loading" id="apiStatus">API status: checking...</div>
+  </header>
+
+  <main class="layout">
+    <nav class="sidebar">
+      <button class="nav-btn active" data-view="run">Nueva extraccion</button>
+      <button class="nav-btn" data-view="collections">Colecciones</button>
+      <button class="nav-btn" data-view="configs">Configuraciones</button>
+      <button class="nav-btn" data-view="history">Historial</button>
+    </nav>
+
+    <section class="content">
+      <section id="view-run" class="card view active">
+        <h2>Nueva extraccion</h2>
+        <p class="section-lead">Carga un documento, elige una configuracion y valida el resultado en un solo flujo.</p>
+        <div class="grid-2">
+          <label>
+            Configuracion
+            <select id="configSelect"></select>
+          </label>
+          <button id="refreshConfigsBtn" class="secondary">Recargar configuraciones</button>
+        </div>
+
+        <div class="grid-2">
+          <label>
+            Subir archivo
+            <input id="documentFile" type="file" accept=".txt,.md,.json,.csv,.xml,.html,.pdf,.docx">
+            <span class="field-hint">Soporta txt, csv, pdf y docx.</span>
+          </label>
+          <button id="parseFileBtn" class="secondary">Cargar texto desde archivo</button>
+        </div>
+
+        <label>
+          Documento (texto)
+          <textarea id="documentText" rows="10" placeholder="Pega aqui el contenido del documento"></textarea>
+        </label>
+
+        <div class="actions">
+          <button id="runExtractionBtn">Ejecutar extraccion</button>
+          <button id="saveValidationBtn" class="secondary">Guardar validacion humana</button>
+        </div>
+
+        <div id="runMessage" class="message" role="status" aria-live="polite"></div>
+
+        <h3>Resultado</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Campo</th>
+              <th>Valor</th>
+              <th>Descripcion</th>
+            </tr>
+          </thead>
+          <tbody id="resultTableBody"></tbody>
+        </table>
+
+        <div id="exportResultActions" class="export-actions" style="display:none">
+          <span class="export-label">Exportar resultado:</span>
+          <button id="exportJsonBtn" class="export-btn">JSON</button>
+          <button id="exportCsvBtn" class="export-btn">CSV</button>
+          <button id="exportXlsxBtn" class="export-btn">Excel</button>
+        </div>
+      </section>
+
+      <!-- ══════════════ COLECCIONES ══════════════ -->
+      <section id="view-collections" class="card view">
+        <h2>Colecciones</h2>
+        <p class="section-lead">Procesa multiples documentos en lote con la misma configuracion y exporta los resultados juntos.</p>
+
+        <div class="collections-setup grid-2">
+          <label>
+            Configuracion
+            <select id="colConfigSelect"></select>
+          </label>
+          <label>
+            Nombre de la coleccion
+            <input id="colName" type="text" placeholder="Ej: Facturas Mayo 2026">
+          </label>
+        </div>
+
+        <div class="collections-upload">
+          <label class="upload-area" id="colUploadArea">
+            <span id="colUploadLabel">Arrastra archivos aqui o haz clic para seleccionar</span>
+            <input id="colFileInput" type="file" accept=".txt,.md,.json,.csv,.xml,.html,.pdf,.docx" multiple style="display:none">
+          </label>
+        </div>
+
+        <div class="actions">
+          <button id="colProcessBtn">Procesar coleccion</button>
+          <button id="colClearBtn" class="secondary">Limpiar lista</button>
+        </div>
+
+        <div id="colMessage" class="message" role="status" aria-live="polite"></div>
+
+        <table id="colQueueTable" style="display:none">
+          <thead>
+            <tr>
+              <th>Archivo</th>
+              <th>Estado</th>
+              <th>Campos</th>
+              <th>Latencia</th>
+              <th>Error</th>
+            </tr>
+          </thead>
+          <tbody id="colQueueBody"></tbody>
+        </table>
+
+        <div id="colSummary" class="col-summary" style="display:none">
+          <span id="colSummaryText"></span>
+          <div class="export-actions" style="margin-top:0">
+            <span class="export-label">Exportar coleccion:</span>
+            <button id="colExportXlsxBtn" class="export-btn">Excel</button>
+            <button id="colExportJsonBtn" class="export-btn">JSON</button>
+            <button id="colExportCsvBtn" class="export-btn">CSV</button>
+          </div>
+        </div>
+
+        <hr class="section-divider">
+
+        <h3>Historial de colecciones</h3>
+        <div class="actions">
+          <button id="colLoadHistoryBtn" class="secondary">Cargar historial</button>
+        </div>
+        <table id="colHistoryTable">
+          <thead>
+            <tr>
+              <th>Nombre</th>
+              <th>Docs</th>
+              <th>OK</th>
+              <th>Fallos</th>
+              <th>Fecha</th>
+              <th>Exportar</th>
+            </tr>
+          </thead>
+          <tbody id="colHistoryBody">
+            <tr><td colspan="6" class="empty-row">Carga el historial para ver colecciones anteriores.</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- ══════════════════════════════════════════ -->
+      <section id="view-configs" class="card view">
+        <h2>Crear configuracion</h2>
+        <p class="section-lead">Define variables claras para que usuarios de administracion validen resultados sin ambiguedad.</p>
+        <h3>Ver configuracion existente</h3>
+        <div class="grid-2">
+          <label>
+            Configuracion guardada
+            <select id="configInspectSelect"></select>
+          </label>
+          <button id="refreshInspectConfigsBtn" class="secondary">Recargar lista</button>
+        </div>
+        <div class="actions">
+          <button id="loadConfigToEditorBtn" class="secondary">Cargar en editor</button>
+          <button id="clearEditorBtn" class="secondary">Nuevo borrador</button>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Nombre</th>
+              <th>Descripcion</th>
+              <th>Tipo</th>
+              <th>Required</th>
+            </tr>
+          </thead>
+          <tbody id="configInspectVariablesBody"></tbody>
+        </table>
+
+        <div class="grid-2">
+          <label>
+            Nombre
+            <input id="cfgName" type="text" placeholder="Facturas proveedor">
+          </label>
+          <label>
+            Modelo
+            <input id="cfgModel" type="text" value="gpt-4o">
+          </label>
+        </div>
+
+        <label>
+          Descripcion
+          <input id="cfgDescription" type="text" placeholder="Extraccion de campos de factura">
+        </label>
+
+        <label>
+          Instrucciones base (debe incluir un placeholder {{...}})
+          <textarea id="cfgPromptBase" rows="7"></textarea>
+        </label>
+
+        <div class="response-format-header">
+          <h3>Response format</h3>
+          <div class="response-format-controls">
+            <span class="compact-label">Modo</span>
+            <select id="cfgResponseFormatMode">
+              <option value="standard">Estandar</option>
+              <option value="custom">Custom</option>
+            </select>
+          </div>
+        </div>
+        <div id="responseFormatPanel" class="response-format-panel">
+          <p class="field-hint">En modo Estandar es solo lectura. En modo Custom puedes editar JSON valido.</p>
+          <textarea id="cfgResponseFormat" rows="3"></textarea>
+        </div>
+
+        <h3>Preview del prompt final</h3>
+        <div class="preview-selector-wrap">
+          <span class="field-hint">Variable en preview:</span>
+          <div id="previewVariableSelector" class="preview-selector"></div>
+        </div>
+        <p class="field-hint">Se actualiza con tus instrucciones, formato de respuesta y variables actuales.</p>
+        <pre id="promptPreview" class="detail-box"></pre>
+
+        <h3>Variables</h3>
+        <div class="grid-3">
+          <input id="varName" type="text" placeholder="Nombre variable">
+          <input id="varDescription" type="text" placeholder="Descripcion">
+          <select id="varType">
+            <option value="string">string</option>
+            <option value="number">number</option>
+          </select>
+        </div>
+        <label>
+          <input id="varRequired" type="checkbox" checked>
+          Variable obligatoria
+          <span class="field-hint">Si no se encuentra en el documento, se devolvera como null.</span>
+        </label>
+        <div class="actions">
+          <button id="addVariableBtn" class="secondary">Agregar variable</button>
+          <button id="updateVariableBtn" class="secondary">Actualizar variable</button>
+          <button id="cancelVariableEditBtn" class="secondary">Cancelar edicion variable</button>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Nombre</th>
+              <th>Descripcion</th>
+              <th>Tipo</th>
+              <th>Required</th>
+              <th>Accion</th>
+            </tr>
+          </thead>
+          <tbody id="variablesTableBody"></tbody>
+        </table>
+
+        <div class="actions">
+          <button id="createConfigBtn">Crear configuracion</button>
+          <button id="updateConfigBtn" class="secondary">Guardar cambios de configuracion</button>
+        </div>
+
+        <div id="configMessage" class="message" role="status" aria-live="polite"></div>
+      </section>
+
+      <section id="view-history" class="card view">
+        <h2>Historial de extracciones</h2>
+        <p class="section-lead">Consulta ejecuciones previas, estados y detalle tecnico para auditoria.</p>
+        <div class="grid-3">
+          <label>
+            Estado
+            <select id="historyStatus">
+              <option value="">todos</option>
+              <option value="success">success</option>
+              <option value="failed">failed</option>
+              <option value="validated">validated</option>
+            </select>
+          </label>
+          <label>
+            Config ID (opcional)
+            <input id="historyConfigId" type="text" placeholder="UUID">
+          </label>
+          <label>
+            Limite
+            <input id="historyLimit" type="number" value="20" min="1" max="200">
+          </label>
+        </div>
+
+        <div class="actions">
+          <button id="loadHistoryBtn" class="secondary">Cargar historial</button>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Documento</th>
+              <th>ID</th>
+              <th>Estado</th>
+              <th>Config</th>
+              <th>Latencia</th>
+              <th>Fecha</th>
+              <th>Detalle</th>
+            </tr>
+          </thead>
+          <tbody id="historyTableBody">
+            <tr>
+              <td colspan="7" class="empty-row">No hay ejecuciones con esos filtros. Ajusta filtros o lanza una nueva extraccion.</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Detalle</h3>
+        <pre id="historyDetail" class="detail-box">Selecciona una extraccion para ver detalle.</pre>
+      </section>
+    </section>
+  </main>
+
+  <script src="/static/app.js?v=20260520c"></script>
+</body>
+</html>

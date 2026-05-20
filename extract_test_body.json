@@ -1,0 +1,25 @@
+{
+  "document_text": "Factura de prueba para el proveedor ACME SL con NIF X1234567L y un importe total de 1234.56 euros.",
+  "variables": [
+    {
+      "name": "NIF",
+      "description": "NIF o NIE del emisor de la factura",
+      "required": true,
+      "type": "string",
+      "validation_regex": "^[0-9XYZ][0-9]{7}[A-Z]$",
+      "max_length": 9
+    },
+    {
+      "name": "NombreEmpresa",
+      "description": "Nombre legal completo de la empresa emisora",
+      "required": true,
+      "type": "string"
+    },
+    {
+      "name": "ImporteTotal",
+      "description": "Importe total de la factura con IVA, solo número",
+      "required": true,
+      "type": "number"
+    }
+  ]
+}
