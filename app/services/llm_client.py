@@ -30,6 +30,23 @@ class LLMExtractionResult(TypedDict):
     cleaned: List[Dict[str, Any]]
 
 
+def _extract_api_error_message(resp: httpx.Response) -> str:
+    """Extrae un mensaje de error corto y seguro desde la respuesta del proveedor."""
+    try:
+        data = resp.json()
+    except ValueError:
+        return "No se pudo parsear el detalle del error del proveedor."
+
+    if isinstance(data, dict):
+        error_obj = data.get("error", {})
+        if isinstance(error_obj, dict):
+            message = error_obj.get("message")
+            if isinstance(message, str) and message.strip():
+                return message.strip()[:300]
+
+    return "No se pudo obtener detalle del error del proveedor."
+
+
 async def call_llm_for_extraction(
     document_text: str,
     variables: List[Dict[str, Any]],
@@ -87,13 +104,32 @@ async def call_llm_for_extraction(
             async with httpx.AsyncClient(timeout=timeout_seconds) as client:
                 resp = await client.post(OPENAI_API_URL, headers=headers, json=payload)
 
+            if resp.status_code == 401:
+                raise LLMExtractionError(
+                    "Autenticacion OpenAI fallida (401): API key invalida o deshabilitada. "
+                    "Genera una clave nueva, actualiza OPENAI_API_KEY en .env y reinicia el servicio."
+                )
+
             if resp.status_code == 429:  # Rate limited
                 wait_time = LLM_RETRY_DELAY_SECONDS * (2 ** attempt)
                 logger.warning(f"Rate limited. Reintentando en {wait_time}s (intento {attempt + 1}/{LLM_RETRY_ATTEMPTS})")
                 await asyncio.sleep(wait_time)
                 continue
-            elif resp.status_code != 200:
-                error_detail = f"HTTP {resp.status_code}: {resp.text[:500]}"
+
+            if resp.status_code == 403:
+                error_message = _extract_api_error_message(resp)
+                raise LLMExtractionError(
+                    f"OpenAI rechazo la solicitud (403). Verifica permisos/proyecto de la API key. Detalle: {error_message}"
+                )
+
+            if 400 <= resp.status_code < 500:
+                error_message = _extract_api_error_message(resp)
+                raise LLMExtractionError(
+                    f"Error de solicitud a OpenAI (HTTP {resp.status_code}). Detalle: {error_message}"
+                )
+
+            if resp.status_code != 200:
+                error_detail = f"HTTP {resp.status_code}"
                 if attempt < LLM_RETRY_ATTEMPTS - 1:
                     logger.warning(f"Error en LLM: {error_detail}. Reintentando... (intento {attempt + 1}/{LLM_RETRY_ATTEMPTS})")
                     await asyncio.sleep(LLM_RETRY_DELAY_SECONDS * (2 ** attempt))
