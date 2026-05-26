@@ -5,47 +5,139 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Centinell Console</title>
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v=20260520b">
-  <link rel="stylesheet" href="/static/styles.css?v=20260520b">
+  <link rel="stylesheet" href="/static/styles.css?v=20260526e">
 </head>
 <body>
   <div class="bg-shape bg-shape-a"></div>
   <div class="bg-shape bg-shape-b"></div>
 
-  <header class="topbar">
-    <div>
-      <h1>Centinell Console</h1>
-      <p>Extraccion inteligente con validacion humana</p>
+  <section id="authGate" class="auth-gate">
+    <div class="auth-panel">
+      <div class="auth-brand">CENTINELL</div>
+      <form id="loginForm" class="auth-form" autocomplete="on">
+        <label>
+          Email
+          <input id="loginEmail" type="email" placeholder="admin@empresa.com" autocomplete="username">
+        </label>
+        <label>
+          Password
+          <input id="loginPassword" type="password" placeholder="••••••••••" autocomplete="current-password">
+        </label>
+        <button id="loginBtn" type="submit">Entrar</button>
+      </form>
+      <div id="authAlert" class="auth-alert">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2zm0 9a1 1 0 0 1 1 1v4a1 1 0 1 1-2 0v-4a1 1 0 0 1 1-1zm0-4a1.25 1.25 0 1 1 0 2.5A1.25 1.25 0 0 1 12 7z"/></svg>
+        <span id="authAlertText"></span>
+      </div>
+      <p id="authMessage" class="auth-message"></p>
     </div>
-    <div class="status-chip is-loading" id="apiStatus">API status: checking...</div>
+  </section>
+
+  <div id="appShell" style="display:none">
+
+  <header class="topbar">
+    <div class="topbar-brand">
+      <h1>Centinell Console</h1>
+    </div>
+
+    <div class="bu-switcher">
+      <label for="buSelect">BU:</label>
+      <div class="bu-switcher-controls">
+        <select id="buSelect" disabled>
+          <option value="">Selecciona BU</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="topbar-actions">
+      <button id="themeToggleBtn" class="icon-btn secondary" type="button" title="Modo nocturno" aria-label="Modo nocturno">
+        <svg id="themeIconMoon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z"/></svg>
+        <svg id="themeIconSun" viewBox="0 0 24 24" aria-hidden="true" style="display:none"><path d="M12 4a1 1 0 0 1 1 1v1a1 1 0 0 1-2 0V5a1 1 0 0 1 1-1zm0 13a1 1 0 0 1 1 1v1a1 1 0 0 1-2 0v-1a1 1 0 0 1 1-1zm9-5a1 1 0 0 1 0 2h-1a1 1 0 0 1 0-2h1zM4 12a1 1 0 0 1 0 2H3a1 1 0 0 1 0-2h1zm14.95-6.36a1 1 0 0 1 0 1.41l-.71.71a1 1 0 1 1-1.41-1.41l.71-.71a1 1 0 0 1 1.41 0zM7.17 16.83a1 1 0 0 1 0 1.41l-.71.71a1 1 0 0 1-1.41-1.41l.71-.71a1 1 0 0 1 1.41 0zm11.31.71a1 1 0 0 1-1.41 0l-.71-.71a1 1 0 0 1 1.41-1.41l.71.71a1 1 0 0 1 0 1.41zM5.88 7.17a1 1 0 0 1-1.41 0l-.71-.71A1 1 0 0 1 5.17 5.05l.71.71a1 1 0 0 1 0 1.41zM12 8a4 4 0 1 1 0 8 4 4 0 0 1 0-8z"/></svg>
+      </button>
+      <div id="authUserBox" class="auth-user-box">
+        <span id="authUserLabel"></span>
+        <button id="logoutBtn" class="secondary" type="button">Salir</button>
+      </div>
+    </div>
   </header>
 
   <main class="layout">
     <nav class="sidebar">
-      <button class="nav-btn active" data-view="run">Nueva extraccion</button>
-      <button class="nav-btn" data-view="collections">Colecciones</button>
-      <button class="nav-btn" data-view="configs">Configuraciones</button>
-      <button class="nav-btn" data-view="history">Historial</button>
+      <div class="sidebar-header">
+        <button id="sidebarToggleBtn" class="sidebar-toggle" type="button" aria-label="Contraer menu" title="Contraer menu">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v2H4V6zm0 5h12v2H4v-2zm0 5h16v2H4v-2z"/></svg>
+        </button>
+      </div>
+
+      <div class="sidebar-nav">
+        <button class="nav-btn active" data-view="run" title="Nueva extraccion">
+          <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 3h12l4 4v14H4V3zm12 1.5V8h3.5L16 4.5zM8 11h8v2H8v-2zm0 4h8v2H8v-2z"/></svg></span>
+          <span class="nav-label">Nueva extraccion</span>
+        </button>
+        <button class="nav-btn" data-view="documents" title="Documentos">
+          <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg></span>
+          <span class="nav-label">Documentos</span>
+        </button>
+        <button class="nav-btn" data-view="collections" title="Colecciones">
+          <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 5h16v4H4V5zm0 5h16v4H4v-4zm0 5h16v4H4v-4z"/></svg></span>
+          <span class="nav-label">Colecciones</span>
+        </button>
+        <button class="nav-btn" data-view="configs" title="Configuraciones">
+          <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.03 7.03 0 0 0-1.63-.94l-.36-2.54a.5.5 0 0 0-.49-.42h-3.84a.5.5 0 0 0-.49.42l-.36 2.54c-.58.23-1.12.54-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.71 8.84a.5.5 0 0 0 .12.64l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32c.13.22.39.31.6.22l2.39-.96c.5.4 1.05.72 1.63.94l.36 2.54c.05.24.25.42.49.42h3.84c.24 0 .44-.18.49-.42l.36-2.54c.58-.23 1.12-.54 1.63-.94l2.39.96c.22.09.47 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58zM12 15.5A3.5 3.5 0 1 1 12 8a3.5 3.5 0 0 1 0 7.5z"/></svg></span>
+          <span class="nav-label">Configuraciones</span>
+        </button>
+        <button class="nav-btn" data-view="assessments" title="Evaluaciones">
+          <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2m-6 9 2 2 4-4"/></svg></span>
+          <span class="nav-label">Evaluaciones</span>
+        </button>
+        <button class="nav-btn" data-view="history" title="Historial">
+          <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M13 3a9 9 0 1 0 8.95 10H20a7 7 0 1 1-2.05-4.95L15 11h7V4l-2.62 2.62A8.96 8.96 0 0 0 13 3zm-1 5h2v5h-5v-2h3V8z"/></svg></span>
+          <span class="nav-label">Historial</span>
+        </button>
+        <button class="nav-btn" data-view="audit" title="Auditoria">
+          <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 2 4 5v6c0 5.55 3.84 10.74 8 12 4.16-1.26 8-6.45 8-12V5l-8-3zm0 2.18 6 2.25V11c0 4.53-3 8.93-6 10-3-1.07-6-5.47-6-10V6.43l6-2.25zm-1 3.82h2v6h-2V8zm0 7h2v2h-2v-2z"/></svg></span>
+          <span class="nav-label">Auditoria</span>
+        </button>
+        <button class="nav-btn" data-view="users" title="Usuarios">
+          <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.79 2.99-4S17.66 3 16 3s-3 1.79-3 4 1.34 4 3 4zm-8 0c1.66 0 2.99-1.79 2.99-4S9.66 3 8 3 5 4.79 5 7s1.34 4 3 4zm0 2c-2.33 0-7 1.17-7 3.5V21h14v-4.5C15 14.17 10.33 13 8 13zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.98 1.97 3.45V21h6v-4.5c0-2.33-4.67-3.5-7-3.5z"/></svg></span>
+          <span class="nav-label">Usuarios</span>
+        </button>
+        <button class="nav-btn" data-view="apikeys" title="API Keys">
+          <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12.65 10A5.99 5.99 0 0 0 7 6a6 6 0 1 0 5.65 8H17v2h2v-2h2v-2h-8.35zM7 14c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4z"/></svg></span>
+          <span class="nav-label">API Keys</span>
+        </button>
+      </div>
+
+      <div class="sidebar-footer">
+        <a class="sidebar-footer-link" href="#" aria-label="Help Guide" title="Help Guide">
+          <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 .001 20.001A10 10 0 0 0 12 2zm0 17a1.25 1.25 0 1 1 0-2.5A1.25 1.25 0 0 1 12 19zm1.02-5.9-.52.3V14h-1.5v-1.35c0-.55.3-1.06.78-1.34l.72-.42a1.7 1.7 0 0 0 .85-1.47A1.98 1.98 0 0 0 11.36 7.5c-.9 0-1.7.57-1.96 1.42l-1.44-.44A3.47 3.47 0 0 1 11.36 6c1.9 0 3.48 1.55 3.48 3.42 0 1.14-.61 2.2-1.8 2.88z"/></svg></span>
+          <span class="nav-label">Help Guide</span>
+        </a>
+        <a class="sidebar-footer-link" href="#" aria-label="The Hub" title="The Hub">
+          <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 4h7v7H4V4zm9 0h7v7h-7V4zM4 13h7v7H4v-7zm9 0h7v7h-7v-7z"/></svg></span>
+          <span class="nav-label">The Hub</span>
+        </a>
+      </div>
     </nav>
 
     <section class="content">
       <section id="view-run" class="card view active">
         <h2>Nueva extraccion</h2>
-        <p class="section-lead">Carga un documento, elige una configuracion y valida el resultado en un solo flujo.</p>
         <div class="grid-2">
-          <label>
-            Configuracion
-            <select id="configSelect"></select>
-          </label>
-          <button id="refreshConfigsBtn" class="secondary">Recargar configuraciones</button>
-        </div>
-
-        <div class="grid-2">
-          <label>
-            Subir archivo
-            <input id="documentFile" type="file" accept=".txt,.md,.json,.csv,.xml,.html,.pdf,.docx">
-            <span class="field-hint">Soporta txt, csv, pdf y docx.</span>
-          </label>
-          <button id="parseFileBtn" class="secondary">Cargar texto desde archivo</button>
+          <div class="run-form-col">
+            <label>
+              Configuracion
+              <select id="configSelect"></select>
+            </label>
+            <div class="file-upload-row">
+              <label for="documentFile">Subir archivo</label>
+              <div class="file-upload-controls">
+                <input id="documentFile" type="file" accept=".txt,.md,.json,.csv,.xml,.html,.pdf,.docx">
+                <button id="parseFileBtn" class="secondary" type="button">Ejecutar OCR</button>
+              </div>
+              <span class="field-hint">Soporta txt, csv, pdf y docx.</span>
+            </div>
+          </div>
         </div>
 
         <label>
@@ -55,28 +147,227 @@
 
         <div class="actions">
           <button id="runExtractionBtn">Ejecutar extraccion</button>
-          <button id="saveValidationBtn" class="secondary">Guardar validacion humana</button>
+          <button id="saveValidationBtn" class="secondary">Sobreescribir cambios</button>
         </div>
 
         <div id="runMessage" class="message" role="status" aria-live="polite"></div>
 
         <h3>Resultado</h3>
-        <table>
+        <div class="run-results-layout">
+          <div class="run-results-main">
+            <table>
+              <thead>
+                <tr>
+                  <th>Campo</th>
+                  <th>Valor</th>
+                </tr>
+              </thead>
+              <tbody id="resultTableBody"></tbody>
+            </table>
+
+            <div id="exportResultActions" class="export-actions" style="display:none">
+              <span class="export-label">Exportar resultado:</span>
+              <button id="exportJsonBtn" class="export-btn">JSON</button>
+              <button id="exportCsvBtn" class="export-btn">CSV</button>
+              <button id="exportXlsxBtn" class="export-btn">Excel</button>
+            </div>
+          </div>
+
+          <aside class="run-document-panel">
+            <h4>Documento en vivo</h4>
+            <pre id="resultDocumentPreview" class="detail-box document-preview-live"></pre>
+          </aside>
+        </div>
+      </section>
+
+      <!-- ══════════════ DOCUMENTOS ══════════════ -->
+      <section id="view-documents" class="card view">
+        <div class="docs-header">
+          <h2>Documentos</h2>
+          <div id="docsPollingBadge" class="docs-polling-badge" style="display:none">
+            <span class="spinner-mini" aria-hidden="true"></span>
+            Procesando OCR...
+          </div>
+        </div>
+
+        <div id="docsUploadZone" class="docs-upload-zone">
+          <div class="docs-upload-inner">
+            <svg class="docs-upload-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/></svg>
+            <p class="docs-upload-label">Arrastra documentos aqui o <span class="docs-upload-link">haz clic para seleccionar</span></p>
+            <p class="docs-upload-hint">PDF, DOCX, TXT, CSV — hasta 20 MB por archivo</p>
+            <input id="docsFileInput" type="file" accept=".txt,.md,.json,.csv,.xml,.html,.pdf,.docx" multiple style="display:none">
+          </div>
+        </div>
+
+        <div id="docsUploadProgress" class="docs-upload-progress" style="display:none"></div>
+
+        <div class="docs-list-header">
+          <span id="docsCount" class="docs-count"></span>
+          <button id="docsRefreshBtn" class="icon-btn secondary" type="button" title="Recargar">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+          </button>
+        </div>
+
+        <div id="docsMessage" class="message" role="status" aria-live="polite"></div>
+
+        <table class="docs-table">
           <thead>
             <tr>
-              <th>Campo</th>
-              <th>Valor</th>
-              <th>Descripcion</th>
+              <th>Nombre</th>
+              <th>Tamaño</th>
+              <th>Subido</th>
+              <th>Estado</th>
+              <th>Acciones</th>
             </tr>
           </thead>
-          <tbody id="resultTableBody"></tbody>
+          <tbody id="docsTableBody">
+            <tr><td colspan="5" class="empty-row">Selecciona una BU para ver documentos.</td></tr>
+          </tbody>
         </table>
 
-        <div id="exportResultActions" class="export-actions" style="display:none">
-          <span class="export-label">Exportar resultado:</span>
-          <button id="exportJsonBtn" class="export-btn">JSON</button>
-          <button id="exportCsvBtn" class="export-btn">CSV</button>
-          <button id="exportXlsxBtn" class="export-btn">Excel</button>
+        <div id="docsLoadMore" class="docs-load-more" style="display:none">
+          <button id="docsLoadMoreBtn" class="secondary">Cargar mas</button>
+        </div>
+      </section>
+
+      <!-- ══════════════ DOCUMENTO DETALLE ══════════════ -->
+      <section id="view-doc-detail" class="card view">
+        <div class="doc-detail-topbar">
+          <button id="docDetailBackBtn" class="back-btn secondary" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+            Documentos
+          </button>
+          <div class="doc-detail-title-area">
+            <h2 id="docDetailFilename"></h2>
+            <span id="docDetailStatus"></span>
+          </div>
+        </div>
+
+        <div class="doc-detail-layout">
+          <div class="doc-detail-left">
+            <div class="doc-detail-run-form card-inner">
+              <h3>Ejecutar evaluacion</h3>
+              <label>
+                Evaluacion
+                <select id="docDetailAssessSelect">
+                  <option value="">Selecciona evaluacion</option>
+                </select>
+              </label>
+              <div class="actions">
+                <button id="docDetailRunBtn" type="button">Ejecutar</button>
+              </div>
+              <div id="docDetailRunMessage" class="message" role="status" aria-live="polite"></div>
+            </div>
+
+            <h3>Ejecuciones anteriores</h3>
+            <div id="docDetailRunsList"><p class="empty-row">Cargando...</p></div>
+          </div>
+
+          <div class="doc-detail-right">
+            <h3>Documento <span id="docDetailMeta" class="field-hint"></span></h3>
+            <div id="docDetailPreviewWrap" class="doc-preview-wrap"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══════════════ RUN DETALLE ══════════════ -->
+      <section id="view-run-detail" class="card view">
+        <div class="doc-detail-topbar">
+          <button id="runDetailBackBtn" class="back-btn secondary" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+            <span id="runDetailBackLabel">Documento</span>
+          </button>
+          <div class="doc-detail-title-area">
+            <h2 id="runDetailAssessName"></h2>
+            <span id="runDetailMeta" class="assess-run-meta"></span>
+          </div>
+        </div>
+
+        <div class="run-detail-layout">
+          <div class="run-detail-results">
+            <div id="runDetailSections"></div>
+          </div>
+          <div class="run-detail-doc">
+            <h3>Documento</h3>
+            <div id="runDetailPreviewWrap" class="doc-preview-wrap"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══════════════ EVALUACIONES ══════════════ -->
+      <section id="view-assessments" class="card view">
+        <div class="assess-layout">
+
+          <!-- LEFT: manage -->
+          <div class="assess-manage">
+            <h2>Evaluaciones</h2>
+
+            <div class="assess-form card-inner">
+              <h3 id="assessFormTitle">Nueva evaluacion</h3>
+              <label>
+                Nombre
+                <input id="assessName" type="text" placeholder="Ej: Analisis de factura">
+              </label>
+              <label>
+                Descripcion <span class="field-hint">(opcional)</span>
+                <textarea id="assessDescription" rows="2" placeholder="Que extrae esta evaluacion..."></textarea>
+              </label>
+              <div class="assess-configs-picker">
+                <label for="assessConfigSelect">Agregar configuracion</label>
+                <div class="assess-config-add-row">
+                  <select id="assessConfigSelect"></select>
+                  <button id="assessAddConfigBtn" type="button" class="secondary">+ Agregar</button>
+                </div>
+                <ul id="assessConfigList" class="assess-config-list">
+                  <li class="assess-config-empty">Agrega al menos una configuracion</li>
+                </ul>
+              </div>
+              <div class="actions">
+                <button id="assessSaveBtn" type="button">Guardar</button>
+                <button id="assessCancelBtn" type="button" class="secondary" style="display:none">Cancelar edicion</button>
+              </div>
+              <div id="assessFormMessage" class="message" role="status" aria-live="polite"></div>
+            </div>
+
+            <h3 class="assess-list-title">Mis evaluaciones</h3>
+            <div id="assessMessage" class="message" role="status" aria-live="polite"></div>
+            <div id="assessList" class="assess-list">
+              <p class="empty-row">Cargando...</p>
+            </div>
+          </div>
+
+          <!-- RIGHT: run -->
+          <div class="assess-run">
+            <h2>Ejecutar</h2>
+
+            <div class="assess-run-form card-inner">
+              <label>
+                Evaluacion
+                <select id="assessRunSelect">
+                  <option value="">Selecciona una evaluacion</option>
+                </select>
+              </label>
+              <label>
+                Documento
+                <select id="assessDocSelect">
+                  <option value="">Selecciona un documento procesado</option>
+                </select>
+              </label>
+              <div class="actions">
+                <button id="assessRunBtn" type="button">Ejecutar evaluacion</button>
+              </div>
+              <div id="assessRunMessage" class="message" role="status" aria-live="polite"></div>
+            </div>
+
+            <div id="assessRunResults" class="assess-run-results" style="display:none">
+              <div class="assess-results-header">
+                <h3 id="assessRunTitle"></h3>
+                <span id="assessRunMeta" class="assess-run-meta"></span>
+              </div>
+              <div id="assessRunSections"></div>
+            </div>
+          </div>
+
         </div>
       </section>
 
@@ -97,10 +388,14 @@
         </div>
 
         <div class="collections-upload">
-          <label class="upload-area" id="colUploadArea">
-            <span id="colUploadLabel">Arrastra archivos aqui o haz clic para seleccionar</span>
+        <div id="colUploadArea" class="docs-upload-zone">
+          <div class="docs-upload-inner">
+            <svg class="docs-upload-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/></svg>
+            <p class="docs-upload-label"><span id="colUploadLabel">Arrastra archivos aqui o <span class="docs-upload-link">haz clic para seleccionar</span></span></p>
+            <p class="docs-upload-hint">PDF, DOCX, TXT, CSV — multiples archivos</p>
             <input id="colFileInput" type="file" accept=".txt,.md,.json,.csv,.xml,.html,.pdf,.docx" multiple style="display:none">
-          </label>
+          </div>
+        </div>
         </div>
 
         <div class="actions">
@@ -159,11 +454,9 @@
       <!-- ══════════════════════════════════════════ -->
       <section id="view-configs" class="card view">
         <h2>Crear configuracion</h2>
-        <p class="section-lead">Define variables claras para que usuarios de administracion validen resultados sin ambiguedad.</p>
-        <h3>Ver configuracion existente</h3>
         <div class="grid-2">
           <label>
-            Configuracion guardada
+            Elige prompt
             <select id="configInspectSelect"></select>
           </label>
           <button id="refreshInspectConfigsBtn" class="secondary">Recargar lista</button>
@@ -172,18 +465,6 @@
           <button id="loadConfigToEditorBtn" class="secondary">Cargar en editor</button>
           <button id="clearEditorBtn" class="secondary">Nuevo borrador</button>
         </div>
-
-        <table>
-          <thead>
-            <tr>
-              <th>Nombre</th>
-              <th>Descripcion</th>
-              <th>Tipo</th>
-              <th>Required</th>
-            </tr>
-          </thead>
-          <tbody id="configInspectVariablesBody"></tbody>
-        </table>
 
         <div class="grid-2">
           <label>
@@ -226,7 +507,6 @@
           <span class="field-hint">Variable en preview:</span>
           <div id="previewVariableSelector" class="preview-selector"></div>
         </div>
-        <p class="field-hint">Se actualiza con tus instrucciones, formato de respuesta y variables actuales.</p>
         <pre id="promptPreview" class="detail-box"></pre>
 
         <h3>Variables</h3>
@@ -268,11 +548,23 @@
         </div>
 
         <div id="configMessage" class="message" role="status" aria-live="polite"></div>
+
+        <div id="copyToBuSection" class="copy-to-bu-section" style="display:none">
+          <hr class="section-divider">
+          <h3>Copiar configuracion a otra BU</h3>
+          <p class="section-lead">Duplica la configuracion seleccionada arriba en otra BU (solo admin_global).</p>
+          <div class="copy-to-bu-row">
+            <select id="copyToBuSelect">
+              <option value="">Selecciona BU destino</option>
+            </select>
+            <button id="copyToBuBtn" type="button" class="secondary">Copiar</button>
+          </div>
+          <div id="copyToBuMessage" class="message" role="status" aria-live="polite"></div>
+        </div>
       </section>
 
       <section id="view-history" class="card view">
         <h2>Historial de extracciones</h2>
-        <p class="section-lead">Consulta ejecuciones previas, estados y detalle tecnico para auditoria.</p>
         <div class="grid-3">
           <label>
             Estado
@@ -306,12 +598,13 @@
               <th>Config</th>
               <th>Latencia</th>
               <th>Fecha</th>
+              <th>Abrir doc</th>
               <th>Detalle</th>
             </tr>
           </thead>
           <tbody id="historyTableBody">
             <tr>
-              <td colspan="7" class="empty-row">No hay ejecuciones con esos filtros. Ajusta filtros o lanza una nueva extraccion.</td>
+              <td colspan="8" class="empty-row">No hay ejecuciones con esos filtros. Ajusta filtros o lanza una nueva extraccion.</td>
             </tr>
           </tbody>
         </table>
@@ -319,9 +612,191 @@
         <h3>Detalle</h3>
         <pre id="historyDetail" class="detail-box">Selecciona una extraccion para ver detalle.</pre>
       </section>
+
+      <section id="view-audit" class="card view">
+        <h2>Auditoria</h2>
+        <div class="grid-3">
+          <label>
+            Event type
+            <input id="auditEventType" type="text" value="authz.denied" placeholder="authz.denied">
+          </label>
+          <label>
+            Actor user ID (opcional)
+            <input id="auditActorUserId" type="text" placeholder="UUID">
+          </label>
+          <label>
+            BU ID (opcional)
+            <input id="auditBuId" type="text" placeholder="UUID">
+          </label>
+        </div>
+        <div class="grid-2">
+          <label>
+            Skip
+            <input id="auditSkip" type="number" value="0" min="0">
+          </label>
+          <label>
+            Limite
+            <input id="auditLimit" type="number" value="50" min="1" max="500">
+          </label>
+        </div>
+        <div class="actions">
+          <button id="loadAuditBtn" class="secondary">Cargar auditoria</button>
+        </div>
+        <div id="auditMessage" class="message" role="status" aria-live="polite"></div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Event</th>
+              <th>Actor</th>
+              <th>BU</th>
+              <th>Recurso</th>
+              <th>Mensaje</th>
+              <th>Detalle</th>
+            </tr>
+          </thead>
+          <tbody id="auditTableBody">
+            <tr><td colspan="7" class="empty-row">Carga auditoria para ver eventos.</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="view-users" class="card view">
+        <h2>Usuarios</h2>
+        <p class="section-lead">Asigna o remueve accesos por BU y cambia el rol BU de usuarios existentes.</p>
+        <div class="users-create-box">
+          <h3>Crear usuario en BU actual</h3>
+          <div class="grid-3 users-create-grid">
+            <label>
+              Email
+              <input id="usersCreateEmail" type="email" placeholder="usuario@empresa.com">
+            </label>
+            <label>
+              Nombre completo
+              <input id="usersCreateFullName" type="text" placeholder="Nombre Apellido">
+            </label>
+            <label>
+              Password
+              <input id="usersCreatePassword" type="password" placeholder="Minimo 10 caracteres">
+            </label>
+          </div>
+          <div class="grid-2 users-create-actions">
+            <label>
+              Rol BU
+              <select id="usersCreateRole">
+                <option value="bu_admin">bu_admin</option>
+                <option value="bu_user" selected>bu_user</option>
+                <option value="bu_viewer">bu_viewer</option>
+              </select>
+            </label>
+            <button id="createUserInBuBtn" type="button">Crear y asignar a esta BU</button>
+          </div>
+        </div>
+        <div class="actions">
+          <button id="reloadUsersAdminBtn" class="secondary">Recargar usuarios</button>
+        </div>
+        <div id="usersAdminMessage" class="message" role="status" aria-live="polite"></div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Nombre</th>
+              <th>Email</th>
+              <th>Rol en BU</th>
+              <th>Accion</th>
+            </tr>
+          </thead>
+          <tbody id="usersAdminTableBody">
+            <tr><td colspan="4" class="empty-row">Carga usuarios para administrar accesos.</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- ══════════════ API KEYS ══════════════ -->
+      <section id="view-apikeys" class="card view">
+        <h2>API Keys</h2>
+        <p class="section-lead">Crea claves de API para integrar Centinell con Power Automate u otros sistemas externos. La clave solo se muestra una vez al crearla.</p>
+
+        <div class="apikeys-create-box">
+          <h3>Nueva API Key</h3>
+          <div class="grid-2">
+            <label>
+              Nombre descriptivo
+              <input id="apikeyName" type="text" placeholder="Power Automate — Facturas">
+            </label>
+            <label>
+              Rol
+              <select id="apikeyRole">
+                <option value="bu_user" selected>bu_user</option>
+                <option value="bu_admin">bu_admin</option>
+                <option value="bu_viewer">bu_viewer</option>
+              </select>
+            </label>
+          </div>
+          <div class="actions">
+            <button id="createApiKeyBtn" type="button">Generar clave</button>
+          </div>
+          <div id="apikeyNewKeyBox" class="apikey-new-key-box" style="display:none">
+            <p class="apikey-warning">Copia esta clave ahora. No volvera a mostrarse.</p>
+            <div class="apikey-copy-row">
+              <code id="apikeyNewKeyValue" class="apikey-value"></code>
+              <button id="apikeyNewKeyCopyBtn" class="secondary apikey-copy-btn" type="button">Copiar</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button id="reloadApiKeysBtn" class="secondary" type="button">Recargar lista</button>
+        </div>
+        <div id="apikeysMessage" class="message" role="status" aria-live="polite"></div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Nombre</th>
+              <th>Prefijo</th>
+              <th>Rol</th>
+              <th>Creada</th>
+              <th>Ultimo uso</th>
+              <th>Accion</th>
+            </tr>
+          </thead>
+          <tbody id="apikeysTableBody">
+            <tr><td colspan="6" class="empty-row">No hay API keys activas.</td></tr>
+          </tbody>
+        </table>
+
+        <div class="apikeys-usage-box">
+          <h3>Como usar la API Key</h3>
+          <p class="section-lead">Incluye la cabecera <code>X-API-Key</code> en tus peticiones HTTP. No es necesario JWT ni X-BU-ID — la clave ya lleva el contexto de BU.</p>
+          <pre class="detail-box">POST /assessments/{assessment_id}/run
+X-API-Key: cnt_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+Content-Type: application/json
+
+{
+  "document_id": "uuid-del-documento"
+}</pre>
+        </div>
+      </section>
     </section>
   </main>
 
-  <script src="/static/app.js?v=20260520c"></script>
+  </div>
+
+  <div id="confirmModal" class="confirm-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="confirmModalTitle">
+    <div class="confirm-modal-backdrop" data-confirm-close="backdrop"></div>
+    <div class="confirm-modal-panel">
+      <h3 id="confirmModalTitle">Confirmar accion</h3>
+      <p id="confirmModalMessage">¿Seguro que quieres continuar?</p>
+      <div class="confirm-modal-actions">
+        <button id="confirmModalCancelBtn" type="button" class="secondary">Cancelar</button>
+        <button id="confirmModalAcceptBtn" type="button" class="danger">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" crossorigin="anonymous"></script>
+  <script src="/static/app.js?v=20260526e"></script>
 </body>
 </html>

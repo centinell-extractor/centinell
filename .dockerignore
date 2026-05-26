@@ -1,0 +1,44 @@
+# Entornos virtuales
+venv/
+.venv/
+env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# Entornos locales (nunca al contenedor)
+.env.dev
+.env.local
+*.env.local
+
+# Tests y CI
+test/
+pytest.ini
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Storage local (se monta como volumen)
+storage/
+
+# Git
+.git/
+.gitignore
+
+# Editores
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docs y scripts de desarrollo
+scripts/
+*.md

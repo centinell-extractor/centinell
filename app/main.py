@@ -1,17 +1,23 @@
 # app/main.py
 import logging
+import os
 from pathlib import Path
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from app.bootstrap import ensure_bootstrap_admin
+from app.db.connection import AsyncSessionLocal, init_models
 from app.routers import prompt_configs
-from app.routers import test_template
-from app.routers import extract_test
 from app.routers import extract
 from app.routers import extractions
 from app.routers import documents
 from app.routers import collections
+from app.routers import auth
+from app.routers import bus
+from app.routers import admin
+from app.routers import assessments
+from app.routers import api_keys
 
 # Configurar logging
 logging.basicConfig(
@@ -22,26 +28,44 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Centinell - Extraction Service")
 
-# CORS para acceso desde frontend
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # TODO: Configurar dominios específicos en producción
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# CORS — sólo orígenes explícitos (vacío = sólo mismo origen, que es el caso normal)
+_raw_origins = os.getenv("CORS_ORIGINS", "").strip()
+_allowed_origins = [o.strip() for o in _raw_origins.split(",") if o.strip()]
+if _allowed_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=_allowed_origins,
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+        allow_headers=["Authorization", "Content-Type", "X-BU-ID", "X-API-Key"],
+    )
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response: Response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "geolocation=(), camera=(), microphone=()"
+    if request.url.scheme == "https":
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    return response
 
 static_dir = Path(__file__).resolve().parent / "static"
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 # Incluir routers
 app.include_router(prompt_configs.router)
-app.include_router(test_template.router)
-app.include_router(extract_test.router)
 app.include_router(extract.router)
 app.include_router(extractions.router)
 app.include_router(documents.router)
 app.include_router(collections.router)
+app.include_router(auth.router)
+app.include_router(bus.router)
+app.include_router(admin.router)
+app.include_router(assessments.router)
+app.include_router(api_keys.router)
 
 
 @app.get("/")
@@ -81,4 +105,16 @@ async def health_check():
 
 @app.on_event("startup")
 async def startup_event():
+    # init_models crea tablas que falten (safety net para dev).
+    # En producción, ejecutar: alembic upgrade head
+    await init_models()
+
+    async with AsyncSessionLocal() as session:
+        await ensure_bootstrap_admin(session)
+
     logger.info("Aplicación iniciada correctamente")
+
+
+@app.get("/{full_path:path}", include_in_schema=False)
+async def spa_catch_all(full_path: str):
+    return FileResponse(static_dir / "index.html")
