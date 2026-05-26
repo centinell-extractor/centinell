@@ -2092,7 +2092,7 @@ function renderDocumentsList() {
   if (!body) return;
 
   if (!state.docsItems.length) {
-    body.innerHTML = '<tr><td colspan="5" class="empty-row">No hay documentos en esta BU. Sube el primero.</td></tr>';
+    body.innerHTML = '<tr><td colspan="6" class="empty-row">No hay documentos en esta BU. Sube el primero.</td></tr>';
     if (countEl) countEl.textContent = "";
     if (loadMoreDiv) loadMoreDiv.style.display = "none";
     return;
@@ -2121,6 +2121,7 @@ function renderDocumentsList() {
           <span class="docs-filename">${doc.filename}</span>
         </div>
       </td>
+      <td class="docs-bu-code">${doc.bu_code ? `<span class="bu-code-badge">${escapeHtml(doc.bu_code)}</span>` : "-"}</td>
       <td class="docs-size">${formatFileSize(doc.size_bytes)}</td>
       <td class="docs-date" title="${fullDate}">${relDate}</td>
       <td>${docStatusBadge(doc.status)}${doc.ocr_error ? `<span class="result-detail-text" title="${doc.ocr_error}" style="display:block;margin-top:2px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${doc.ocr_error}</span>` : ""}</td>

@@ -47,6 +47,26 @@ router = APIRouter(prefix="/documents", tags=["documents"])
 storage_service = DocumentStorageService(DOCUMENT_STORAGE_DIR)
 
 
+def _doc_to_read(doc: Document, bu_code: str | None) -> DocumentRead:
+    return DocumentRead(
+        id=doc.id, bu_id=doc.bu_id, bu_code=bu_code,
+        title=doc.title, filename=doc.filename, mime_type=doc.mime_type,
+        size_bytes=doc.size_bytes, storage_key=doc.storage_key,
+        created_by=doc.created_by, created_at=doc.created_at,
+        status=doc.status, ocr_text=doc.ocr_text, ocr_error=doc.ocr_error,
+    )
+
+
+async def _enrich_docs(docs: list[Document], db: AsyncSession) -> list[DocumentRead]:
+    bu_ids = {d.bu_id for d in docs}
+    bu_codes: dict = {}
+    if bu_ids:
+        result = await db.execute(select(BusinessUnit).where(BusinessUnit.id.in_(bu_ids)))
+        for bu in result.scalars().all():
+            bu_codes[bu.id] = bu.code
+    return [_doc_to_read(d, bu_codes.get(d.bu_id)) for d in docs]
+
+
 def _parse_int_csv(raw: str, default_values: list[int]) -> list[int]:
     values: list[int] = []
     for chunk in (raw or "").split(","):
@@ -244,7 +264,7 @@ async def upload_document(
 
     background_tasks.add_task(_run_ocr_background, document.id, content, filename)
 
-    return document
+    return _doc_to_read(document, bu.code)
 
 
 @router.get("/", response_model=DocumentListResponse)
@@ -269,7 +289,8 @@ async def list_documents(
     )
     result = await db.execute(stmt)
     items = list(result.scalars().all())
-    return DocumentListResponse(items=items, total=total)
+    enriched = await _enrich_docs(items, db)
+    return DocumentListResponse(items=enriched, total=total)
 
 
 @router.get("/{document_id}", response_model=DocumentRead)
@@ -284,7 +305,8 @@ async def get_document(
     document = result.scalars().first()
     if not document:
         raise HTTPException(status_code=404, detail="Documento no encontrado")
-    return document
+    enriched = await _enrich_docs([document], db)
+    return enriched[0]
 
 
 @router.get("/{document_id}/download")

@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict
 class DocumentRead(BaseModel):
     id: UUID
     bu_id: UUID
+    bu_code: str | None = None
     title: str
     filename: str
     mime_type: str
