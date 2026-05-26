@@ -26,7 +26,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Centinell - Extraction Service")
+app = FastAPI(
+    title="Centinell - Extraction Service",
+    docs_url="/api/docs",
+    redoc_url="/api/redoc",
+    openapi_url="/api/openapi.json",
+)
 
 # CORS — sólo orígenes explícitos (vacío = sólo mismo origen, que es el caso normal)
 _raw_origins = os.getenv("CORS_ORIGINS", "").strip()
