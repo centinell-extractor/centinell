@@ -9,7 +9,6 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
 
 
 revision: str = '0003'
@@ -19,38 +18,57 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # ── api_keys ──────────────────────────────────────────────────
-    op.create_table(
-        'api_keys',
-        sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column('bu_id', postgresql.UUID(as_uuid=True),
-                  sa.ForeignKey('business_units.id', ondelete='CASCADE'), nullable=False),
-        sa.Column('created_by', postgresql.UUID(as_uuid=True),
-                  sa.ForeignKey('users.id', ondelete='SET NULL'), nullable=True),
-        sa.Column('name', sa.String(100), nullable=False),
-        sa.Column('key_prefix', sa.String(16), nullable=False),
-        sa.Column('key_hash', sa.String(64), nullable=False, unique=True),
-        sa.Column('role', sa.String(20), nullable=False, server_default='bu_user'),
-        sa.Column('is_active', sa.Boolean(), nullable=False, server_default='true'),
-        sa.Column('created_at', sa.TIMESTAMP(timezone=True), server_default=sa.func.now()),
-        sa.Column('last_used_at', sa.TIMESTAMP(timezone=True), nullable=True),
-    )
-    op.create_index('idx_api_keys_bu', 'api_keys', ['bu_id'])
-    op.create_index('idx_api_keys_hash', 'api_keys', ['key_hash'])
+    # Use raw SQL so each step is idempotent (init_models may have already
+    # created tables/columns via create_all on the same production DB).
 
-    # ── assessment_runs.created_by ────────────────────────────────
-    op.add_column(
-        'assessment_runs',
-        sa.Column('created_by', postgresql.UUID(as_uuid=True),
-                  sa.ForeignKey('users.id', ondelete='SET NULL'), nullable=True),
-    )
-    op.create_index('idx_assessment_run_created_by', 'assessment_runs', ['created_by'])
+    op.execute("""
+        CREATE TABLE IF NOT EXISTS api_keys (
+            id UUID PRIMARY KEY,
+            bu_id UUID NOT NULL REFERENCES business_units(id) ON DELETE CASCADE,
+            created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+            name VARCHAR(100) NOT NULL,
+            key_prefix VARCHAR(16) NOT NULL,
+            key_hash VARCHAR(64) NOT NULL UNIQUE,
+            role VARCHAR(20) NOT NULL DEFAULT 'bu_user',
+            is_active BOOLEAN NOT NULL DEFAULT TRUE,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+            last_used_at TIMESTAMP WITH TIME ZONE
+        )
+    """)
+
+    op.execute("""
+        CREATE INDEX IF NOT EXISTS idx_api_keys_bu ON api_keys (bu_id)
+    """)
+
+    op.execute("""
+        CREATE INDEX IF NOT EXISTS idx_api_keys_hash ON api_keys (key_hash)
+    """)
+
+    op.execute("""
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'assessment_runs' AND column_name = 'created_by'
+            ) THEN
+                ALTER TABLE assessment_runs
+                    ADD COLUMN created_by UUID REFERENCES users(id) ON DELETE SET NULL;
+            END IF;
+        END
+        $$
+    """)
+
+    op.execute("""
+        CREATE INDEX IF NOT EXISTS idx_assessment_run_created_by
+            ON assessment_runs (created_by)
+    """)
 
 
 def downgrade() -> None:
-    op.drop_index('idx_assessment_run_created_by', table_name='assessment_runs')
-    op.drop_column('assessment_runs', 'created_by')
-
-    op.drop_index('idx_api_keys_hash', table_name='api_keys')
-    op.drop_index('idx_api_keys_bu', table_name='api_keys')
-    op.drop_table('api_keys')
+    op.execute("DROP INDEX IF EXISTS idx_assessment_run_created_by")
+    op.execute("""
+        ALTER TABLE assessment_runs DROP COLUMN IF EXISTS created_by
+    """)
+    op.execute("DROP INDEX IF EXISTS idx_api_keys_hash")
+    op.execute("DROP INDEX IF EXISTS idx_api_keys_bu")
+    op.execute("DROP TABLE IF EXISTS api_keys")
