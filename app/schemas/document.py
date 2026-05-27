@@ -8,6 +8,7 @@ class DocumentRead(BaseModel):
     id: UUID
     bu_id: UUID
     bu_code: str | None = None
+    created_by_name: str | None = None
     title: str
     filename: str
     mime_type: str

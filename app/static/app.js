@@ -67,7 +67,7 @@ function toggleTheme() {
 }
 
 const defaultPrompt = [
-  "Eres Centinell, un sistema de extraccion de informacion de documentos.",
+  "Eres Centinell, un sistema de extracción de información de documentos.",
   "Extrae exclusivamente los campos indicados.",
   "No anadas explicaciones ni texto adicional.",
   "",
@@ -151,6 +151,15 @@ function canManageUsers() {
 }
 
 function canManageApiKeys() {
+  const role = state.currentUser?.role;
+  return role === "admin_global" || role === "bu_admin";
+}
+
+/**
+ * Devuelve true si el usuario puede lanzar/ver extracciónes y evaluaciónes.
+ * bu_user y bu_viewer NO pueden: solo admin_global y bu_admin tienen acceso.
+ */
+function canRunExtractions() {
   const role = state.currentUser?.role;
   return role === "admin_global" || role === "bu_admin";
 }
@@ -262,6 +271,30 @@ function applyRoleBasedUi() {
   }
 
   updateCopyToBuVisibility();
+
+  // ─── bu_user: sin Nueva Extracción, Evaluaciónes ni Historial ─────────────
+  const canExtract = canRunExtractions();
+  ["run", "assessments", "history"].forEach((viewName) => {
+    const navBtn = document.querySelector(`.nav-btn[data-view="${viewName}"]`);
+    const viewEl = el(`view-${viewName}`);
+    if (navBtn) navBtn.style.display = canExtract ? "" : "none";
+    if (viewEl) viewEl.style.display = canExtract ? "" : "none";
+  });
+
+  // Si la vista activa es una de las restringidas, redirigir a Documentos
+  if (!canExtract) {
+    const activeView = document.querySelector(".view.active");
+    if (activeView) {
+      const activeName = activeView.id.replace("view-", "");
+      if (["run", "assessments", "history"].includes(activeName)) {
+        activateView("documents", "replace");
+      }
+    }
+  }
+
+  // Columna Acciones de la tabla de documentos
+  const actionsHeader = el("docsActionsHeader");
+  if (actionsHeader) actionsHeader.style.display = canExtract ? "" : "none";
 }
 
 function renderUsersAdminTable() {
@@ -323,7 +356,7 @@ async function loadUsersAdminData() {
   }
 
   if (!hasSession() || !state.selectedBuId) {
-    setMessage("usersAdminMessage", "Haz login y selecciona una BU", "error");
+    setMessage("usersAdminMessage", "Haz login y seleccióna una BU", "error");
     return;
   }
 
@@ -355,7 +388,7 @@ async function assignUserAccess(userId, role) {
   }
 
   if (!state.selectedBuId) {
-    setMessage("usersAdminMessage", "Selecciona una BU", "error");
+    setMessage("usersAdminMessage", "Seleccióna una BU", "error");
     return;
   }
 
@@ -379,7 +412,7 @@ async function removeUserAccess(userId) {
   }
 
   if (!state.selectedBuId) {
-    setMessage("usersAdminMessage", "Selecciona una BU", "error");
+    setMessage("usersAdminMessage", "Seleccióna una BU", "error");
     return;
   }
 
@@ -413,7 +446,7 @@ async function createUserInCurrentBu() {
   }
 
   if (!state.selectedBuId) {
-    setMessage("usersAdminMessage", "Selecciona una BU", "error");
+    setMessage("usersAdminMessage", "Seleccióna una BU", "error");
     return;
   }
 
@@ -537,7 +570,7 @@ function renderApiKeysTable(keys) {
 async function createApiKey() {
   if (!canManageApiKeys()) return;
   if (!state.selectedBuId) {
-    setMessage("apikeysMessage", "Selecciona una BU primero", "error");
+    setMessage("apikeysMessage", "Seleccióna una BU primero", "error");
     return;
   }
   const name = (el("apikeyName")?.value || "").trim();
@@ -904,7 +937,7 @@ function ensureSessionAndBu() {
     throw new Error("Haz login primero");
   }
   if (!state.selectedBuId) {
-    throw new Error("Selecciona una BU activa");
+    throw new Error("Seleccióna una BU activa");
   }
 }
 
@@ -944,7 +977,7 @@ function getEffectiveResponseFormat() {
   return custom.trim() || strictResponseFormat;
 }
 
-function validateResponseFormatJson(showMessage = false) {
+function válidateResponseFormatJson(showMessage = false) {
   if (state.responseFormatMode !== "custom") {
     return true;
   }
@@ -1219,7 +1252,7 @@ async function loadAssessments() {
     renderAssessmentList();
     populateAssessRunSelect();
   } catch (err) {
-    setMessage("assessMessage", `Error cargando evaluaciones: ${err.message}`, "error");
+    setMessage("assessMessage", `Error cargando evaluaciónes: ${err.message}`, "error");
   }
 }
 
@@ -1228,7 +1261,7 @@ function renderAssessmentList() {
   if (!container) return;
 
   if (!state.assessments.length) {
-    container.innerHTML = '<p class="empty-row">No hay evaluaciones. Crea la primera.</p>';
+    container.innerHTML = '<p class="empty-row">No hay evaluaciónes. Crea la primera.</p>';
     return;
   }
 
@@ -1255,7 +1288,7 @@ function renderAssessmentList() {
         </div>
       </div>
       ${a.description ? `<p class="assess-card-desc">${a.description}</p>` : ""}
-      <div class="assess-card-configs">${configTags || '<span style="font-size:.75rem;color:var(--text-3)">Sin configuraciones</span>'}</div>
+      <div class="assess-card-configs">${configTags || '<span style="font-size:.75rem;color:var(--text-3)">Sin configuraciónes</span>'}</div>
     `;
 
     card.querySelector(`[data-assess-run="${a.id}"]`)?.addEventListener("click", () => {
@@ -1276,7 +1309,7 @@ function renderAssessConfigDraft() {
   if (!list) return;
 
   if (!state.assessConfigsDraft.length) {
-    list.innerHTML = '<li class="assess-config-empty">Agrega al menos una configuracion</li>';
+    list.innerHTML = '<li class="assess-config-empty">Agrega al menos una configuración</li>';
     return;
   }
 
@@ -1300,7 +1333,7 @@ function renderAssessConfigDraft() {
 function populateAssessConfigSelect() {
   const sel = el("assessConfigSelect");
   if (!sel) return;
-  sel.innerHTML = '<option value="">Selecciona config...</option>';
+  sel.innerHTML = '<option value="">Seleccióna config...</option>';
   Object.values(state.configsById).forEach((cfg) => {
     const opt = document.createElement("option");
     opt.value = cfg.id;
@@ -1313,7 +1346,7 @@ function populateAssessConfigSelect() {
 function populateAssessRunSelect() {
   const sel = el("assessRunSelect");
   if (!sel) return;
-  sel.innerHTML = '<option value="">Selecciona una evaluacion</option>';
+  sel.innerHTML = '<option value="">Seleccióna una evaluación</option>';
   state.assessments.forEach((a) => {
     const opt = document.createElement("option");
     opt.value = a.id;
@@ -1326,7 +1359,7 @@ function populateAssessDocSelect() {
   const sel = el("assessDocSelect");
   if (!sel) return;
   const processed = (state.docsItems || []).filter((d) => d.status === "processed" && d.ocr_text);
-  sel.innerHTML = '<option value="">Selecciona un documento procesado</option>';
+  sel.innerHTML = '<option value="">Seleccióna un documento procesado</option>';
   processed.forEach((d) => {
     const opt = document.createElement("option");
     opt.value = d.id;
@@ -1357,7 +1390,7 @@ function editAssessment(assessmentId) {
   }));
   renderAssessConfigDraft();
 
-  el("assessFormTitle").textContent = "Editar evaluacion";
+  el("assessFormTitle").textContent = "Editar evaluación";
   el("assessSaveBtn").textContent = "Actualizar";
   el("assessCancelBtn").style.display = "";
   el("assessName").focus();
@@ -1370,7 +1403,7 @@ function cancelAssessEdit() {
   el("assessName").value = "";
   el("assessDescription").value = "";
   renderAssessConfigDraft();
-  el("assessFormTitle").textContent = "Nueva evaluacion";
+  el("assessFormTitle").textContent = "Nueva evaluación";
   el("assessSaveBtn").textContent = "Guardar";
   el("assessCancelBtn").style.display = "none";
   setMessage("assessFormMessage", "", "idle");
@@ -1383,7 +1416,7 @@ async function saveAssessment() {
     return;
   }
   if (!state.assessConfigsDraft.length) {
-    setMessage("assessFormMessage", "Agrega al menos una configuracion", "error");
+    setMessage("assessFormMessage", "Agrega al menos una configuración", "error");
     return;
   }
 
@@ -1402,7 +1435,7 @@ async function saveAssessment() {
     }
     cancelAssessEdit();
     await loadAssessments();
-    setMessage("assessMessage", "Evaluacion guardada", "success");
+    setMessage("assessMessage", "Evaluación guardada", "success");
   } catch (err) {
     setMessage("assessFormMessage", `Error: ${err.message}`, "error");
   }
@@ -1411,8 +1444,8 @@ async function saveAssessment() {
 async function deleteAssessment(assessmentId) {
   const a = state.assessments.find((x) => x.id === assessmentId);
   const confirmed = await openConfirmModal({
-    title: "Eliminar evaluacion",
-    message: `¿Eliminar la evaluacion "${a?.name}"?`,
+    title: "Eliminar evaluación",
+    message: `¿Eliminar la evaluación "${a?.name}"?`,
     acceptLabel: "Eliminar",
     cancelLabel: "Cancelar",
   });
@@ -1421,7 +1454,7 @@ async function deleteAssessment(assessmentId) {
   try {
     await api(`/assessments/${assessmentId}`, { method: "DELETE" });
     await loadAssessments();
-    setMessage("assessMessage", "Evaluacion eliminada", "success");
+    setMessage("assessMessage", "Evaluación eliminada", "success");
   } catch (err) {
     setMessage("assessMessage", `Error: ${err.message}`, "error");
   }
@@ -1432,18 +1465,18 @@ async function runAssessment() {
   const docId = el("assessDocSelect")?.value;
 
   if (!assessmentId) {
-    setMessage("assessRunMessage", "Selecciona una evaluacion", "error");
+    setMessage("assessRunMessage", "Seleccióna una evaluación", "error");
     return;
   }
 
   const doc = docId ? (state.docsItems || []).find((d) => d.id === docId) : null;
   const documentText = doc?.ocr_text || "";
   if (!documentText.trim()) {
-    setMessage("assessRunMessage", "Selecciona un documento con texto procesado", "error");
+    setMessage("assessRunMessage", "Seleccióna un documento con texto procesado", "error");
     return;
   }
 
-  setMessage("assessRunMessage", "Iniciando evaluacion...", "loading");
+  setMessage("assessRunMessage", "Iniciando evaluación...", "loading");
   el("assessRunBtn").disabled = true;
 
   const resultsEl = el("assessRunResults");
@@ -1478,7 +1511,7 @@ async function runAssessment() {
       if (run.status === "success") {
         renderAssessmentRunResults(run);
         const latency = run.latency_ms ? ` en ${(run.latency_ms / 1000).toFixed(1)}s` : "";
-        setMessage("assessRunMessage", `Evaluacion completada${latency}`, "success");
+        setMessage("assessRunMessage", `Evaluación completada${latency}`, "success");
         return;
       }
 
@@ -1488,7 +1521,7 @@ async function runAssessment() {
       }
     }
 
-    setMessage("assessRunMessage", "La evaluacion esta tardando demasiado. Intentalo de nuevo.", "error");
+    setMessage("assessRunMessage", "La evaluación esta tardando demasiado. Intentalo de nuevo.", "error");
   } catch (err) {
     setMessage("assessRunMessage", `Error: ${err.message}`, "error");
   } finally {
@@ -1818,7 +1851,7 @@ async function loadDocumentDetail(docId) {
 
     const sel = el("docDetailAssessSelect");
     if (sel) {
-      sel.innerHTML = '<option value="">Selecciona evaluacion</option>';
+      sel.innerHTML = '<option value="">Seleccióna evaluación</option>';
       (state.assessments || []).filter((a) => a.is_active).forEach((a) => {
         const opt = document.createElement("option");
         opt.value = a.id;
@@ -1858,7 +1891,7 @@ function renderDocDetailRuns(runs, doc) {
     const who = run.created_by_name || "";
     card.innerHTML = `
       <div class="doc-run-card-header">
-        <span class="doc-run-card-name">${run.assessment_name || "Evaluacion"}</span>
+        <span class="doc-run-card-name">${run.assessment_name || "Evaluación"}</span>
         <span class="doc-run-card-meta">${[date, latency, who].filter(Boolean).join(" · ")}</span>
         ${badge}
       </div>
@@ -1876,12 +1909,12 @@ async function runAssessmentFromDetail() {
   const doc = state.docDetailDoc;
   const assessId = el("docDetailAssessSelect")?.value;
 
-  if (!assessId) { setMessage("docDetailRunMessage", "Selecciona una evaluacion", "error"); return; }
+  if (!assessId) { setMessage("docDetailRunMessage", "Seleccióna una evaluación", "error"); return; }
   if (!doc?.ocr_text?.trim()) { setMessage("docDetailRunMessage", "El documento no tiene texto procesado aun", "error"); return; }
 
   const btn = el("docDetailRunBtn");
   btn.disabled = true;
-  setMessage("docDetailRunMessage", "Lanzando evaluacion...", "loading");
+  setMessage("docDetailRunMessage", "Lanzando evaluación...", "loading");
 
   try {
     const pending = await api(`/assessments/${assessId}/run`, {
@@ -1935,7 +1968,7 @@ async function loadRunDetail(docId, runId) {
     }
 
     if (el("runDetailBackLabel")) el("runDetailBackLabel").textContent = doc?.filename || "Documento";
-    if (el("runDetailAssessName")) el("runDetailAssessName").textContent = run.assessment_name || "Evaluacion";
+    if (el("runDetailAssessName")) el("runDetailAssessName").textContent = run.assessment_name || "Evaluación";
 
     const latency = run.latency_ms ? `${(run.latency_ms / 1000).toFixed(1)}s` : "";
     const date = run.created_at ? new Date(run.created_at).toLocaleString("es-ES") : "";
@@ -2091,8 +2124,11 @@ function renderDocumentsList() {
   const loadMoreDiv = el("docsLoadMore");
   if (!body) return;
 
+  const showActions = canRunExtractions();
+  const colSpan = showActions ? 6 : 5;
+
   if (!state.docsItems.length) {
-    body.innerHTML = '<tr><td colspan="6" class="empty-row">No hay documentos en esta BU. Sube el primero.</td></tr>';
+    body.innerHTML = `<tr><td colspan="${colSpan}" class="empty-row">No hay documentos en esta BU. Sube el primero.</td></tr>`;
     if (countEl) countEl.textContent = "";
     if (loadMoreDiv) loadMoreDiv.style.display = "none";
     return;
@@ -2121,10 +2157,11 @@ function renderDocumentsList() {
           <span class="docs-filename">${doc.filename}</span>
         </div>
       </td>
-      <td class="docs-bu-code">${doc.bu_code ? `<span class="bu-code-badge">${escapeHtml(doc.bu_code)}</span>` : "-"}</td>
+      <td class="docs-uploaded-by">${doc.created_by_name ? escapeHtml(doc.created_by_name) : "-"}</td>
       <td class="docs-size">${formatFileSize(doc.size_bytes)}</td>
       <td class="docs-date" title="${fullDate}">${relDate}</td>
       <td>${docStatusBadge(doc.status)}${doc.ocr_error ? `<span class="result-detail-text" title="${doc.ocr_error}" style="display:block;margin-top:2px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${doc.ocr_error}</span>` : ""}</td>
+      ${showActions ? `
       <td>
         <div class="docs-row-actions">
           <button type="button" class="secondary" data-doc-open="${doc.id}" ${canOpen ? "" : "disabled"} title="${openTitle}">Abrir</button>
@@ -2132,7 +2169,7 @@ function renderDocumentsList() {
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6l1 2h4v2H4V5h4l1-2zm1 6h2v9h-2V9zm4 0h2v9h-2V9zM7 9h2v9H7V9zm1 12h8a2 2 0 0 0 2-2V9H6v10a2 2 0 0 0 2 2z"/></svg>
           </button>
         </div>
-      </td>
+      </td>` : ""}
     `;
     body.appendChild(tr);
   });
@@ -2141,13 +2178,15 @@ function renderDocumentsList() {
     cell.addEventListener("click", () => openDocumentDetail(cell.dataset.docDetail));
   });
 
-  body.querySelectorAll("button[data-doc-open]").forEach((btn) => {
-    btn.addEventListener("click", () => openDocumentInExtractor(btn.dataset.docOpen));
-  });
+  if (showActions) {
+    body.querySelectorAll("button[data-doc-open]").forEach((btn) => {
+      btn.addEventListener("click", () => openDocumentInExtractor(btn.dataset.docOpen));
+    });
 
-  body.querySelectorAll("button[data-doc-delete]").forEach((btn) => {
-    btn.addEventListener("click", () => deleteDocument(btn.dataset.docDelete));
-  });
+    body.querySelectorAll("button[data-doc-delete]").forEach((btn) => {
+      btn.addEventListener("click", () => deleteDocument(btn.dataset.docDelete));
+    });
+  }
 
   if (loadMoreDiv) {
     loadMoreDiv.style.display = state.docsItems.length < state.docsTotal ? "" : "none";
@@ -2331,6 +2370,14 @@ function parseCurrentPath() {
 
 // historyMode: "push" | "replace" | "none"
 function activateView(view, historyMode = "push", params = {}) {
+  // Guard: si el usuario no puede ejecutar extracciónes y navega a una vista
+  // restringida (por URL directa o pushState), redirigir a Documentos.
+  if (hasSession() && !canRunExtractions() && ["run", "assessments", "history"].includes(view)) {
+    view = "documents";
+    historyMode = "replace";
+    params = {};
+  }
+
   const navView = VIEW_PARENT[view] ?? view;
   document.querySelectorAll(".nav-btn").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.view === navView);
@@ -2395,7 +2442,7 @@ function renderVariablesDraft() {
       el("varDescription").value = variable.description;
       el("varType").value = variable.type || "string";
       el("varRequired").checked = variable.required !== false;
-      setMessage("configMessage", "Editando variable seleccionada");
+      setMessage("configMessage", "Editando variable selecciónada");
     });
   });
 
@@ -2475,9 +2522,9 @@ async function loadConfigs() {
     const select = el("configSelect");
     const inspectSelect = el("configInspectSelect");
     const colSelect = el("colConfigSelect");
-    select.innerHTML = '<option value="">Haz login y selecciona una BU</option>';
-    inspectSelect.innerHTML = '<option value="">Haz login y selecciona una BU</option>';
-    if (colSelect) colSelect.innerHTML = '<option value="">Haz login y selecciona una BU</option>';
+    select.innerHTML = '<option value="">Haz login y seleccióna una BU</option>';
+    inspectSelect.innerHTML = '<option value="">Haz login y seleccióna una BU</option>';
+    if (colSelect) colSelect.innerHTML = '<option value="">Haz login y seleccióna una BU</option>';
     return;
   }
 
@@ -2487,14 +2534,14 @@ async function loadConfigs() {
   } catch (error) {
     state.configsById = {};
     clearConfigEditor({ silent: true });
-    setMessage("configMessage", `No se pudieron cargar configuraciones: ${error.message}`, "error");
+    setMessage("configMessage", `No se pudieron cargar configuraciónes: ${error.message}`, "error");
     return;
   }
 
   if (!Array.isArray(configs)) {
     state.configsById = {};
     clearConfigEditor({ silent: true });
-    setMessage("configMessage", "Respuesta invalida al cargar configuraciones", "error");
+    setMessage("configMessage", "Respuesta inválida al cargar configuraciónes", "error");
     return;
   }
 
@@ -2517,7 +2564,7 @@ async function loadConfigs() {
     clearConfigEditor({ silent: true });
     const option = document.createElement("option");
     option.value = "";
-    option.textContent = "No hay configuraciones";
+    option.textContent = "No hay configuraciónes";
     select.appendChild(option);
     inspectSelect.appendChild(option.cloneNode(true));
     if (colSelect) colSelect.appendChild(option.cloneNode(true));
@@ -2563,7 +2610,7 @@ async function loadConfigs() {
     colSelect.value = preferredId;
   }
 
-  // Si hay una configuración seleccionada en el desplegable, reflejarla en el editor
+  // Si hay una configuración selecciónada en el desplegable, reflejarla en el editor
   // para que el preview siempre muestre variables reales y no un estado vacío.
   if (getSelectedInspectConfigId()) {
     loadSelectedConfigToEditor(getSelectedInspectConfigId());
@@ -2577,7 +2624,7 @@ function loadSelectedConfigToEditor(configIdOverride) {
 
   if (!config) {
     clearConfigEditor({ silent: true });
-    setMessage("configMessage", "Selecciona una configuracion valida", "error");
+    setMessage("configMessage", "Seleccióna una configuración válida", "error");
     return;
   }
 
@@ -2596,14 +2643,14 @@ function loadSelectedConfigToEditor(configIdOverride) {
         description: v.description || "",
         required: v.required !== false,
         type: v.type || "string",
-        validation_regex: v.validation_regex || null,
+        válidation_regex: v.validation_regex || null,
         max_length: v.max_length || null,
       }))
     : [];
   renderVariablesDraft();
   clearVariableInputs();
   renderPromptPreview();
-  setMessage("configMessage", `Configuracion cargada para edicion: ${config.id}`, "success");
+  setMessage("configMessage", `Configuración cargada para edicion: ${config.id}`, "success");
 }
 
 function clearConfigEditor(options = {}) {
@@ -2622,7 +2669,7 @@ function clearConfigEditor(options = {}) {
   renderVariablesDraft();
   renderPromptPreview();
   if (!silent) {
-    setMessage("configMessage", "Editor limpio. Listo para nueva configuracion", "idle");
+    setMessage("configMessage", "Editor limpio. Listo para nueva configuración", "idle");
   }
 }
 
@@ -2653,7 +2700,7 @@ function downloadBlob(blob, filename) {
 function getExportFilename(ext) {
   const base = state.lastDocumentName
     ? state.lastDocumentName.replace(/\.[^.]+$/, "")
-    : "extraccion";
+    : "extracción";
   return `${base}.${ext}`;
 }
 
@@ -2991,7 +3038,7 @@ async function runExtraction() {
   const documentText = el("documentText").value.trim();
 
   if (!configId) {
-    setMessage("runMessage", "Selecciona una configuracion", "error");
+    setMessage("runMessage", "Seleccióna una configuración", "error");
     return;
   }
 
@@ -3000,7 +3047,7 @@ async function runExtraction() {
     return;
   }
 
-  setMessage("runMessage", "Enviando extraccion...", "loading");
+  setMessage("runMessage", "Enviando extracción...", "loading");
   el("runExtractionBtn").disabled = true;
 
   try {
@@ -3021,7 +3068,7 @@ async function runExtraction() {
     state.lastConfigId = configId;
 
     if (!extractionId) {
-      setMessage("runMessage", "No se pudo crear la extraccion", "error");
+      setMessage("runMessage", "No se pudo crear la extracción", "error");
       return;
     }
 
@@ -3045,18 +3092,18 @@ async function runExtraction() {
         const descriptionMap = buildVariableDescriptionMap(configId);
         renderResult(items, descriptionMap);
         const latency = extraction.latency_ms ? ` (${(extraction.latency_ms / 1000).toFixed(1)}s)` : "";
-        setMessage("runMessage", `Extraccion completada${latency}`, "success");
+        setMessage("runMessage", `Extracción completada${latency}`, "success");
         await loadHistory();
         return;
       }
 
       if (extraction.status === "failed") {
-        setMessage("runMessage", `Error en la extraccion: ${extraction.error_message || "desconocido"}`, "error");
+        setMessage("runMessage", `Error en la extracción: ${extraction.error_message || "desconocido"}`, "error");
         return;
       }
     }
 
-    setMessage("runMessage", "La extraccion esta tardando demasiado. Comprueba el historial.", "error");
+    setMessage("runMessage", "La extracción esta tardando demasiado. Comprueba el historial.", "error");
   } catch (error) {
     setMessage("runMessage", `Error: ${error.message}`, "error");
   } finally {
@@ -3073,7 +3120,7 @@ async function saveValidation() {
   }
 
   if (!state.lastExtractionId) {
-    setMessage("runMessage", "Primero ejecuta una extraccion para poder validar", "error");
+    setMessage("runMessage", "Primero ejecuta una extracción para poder válidar", "error");
     return;
   }
 
@@ -3109,7 +3156,7 @@ async function saveValidation() {
     setMessage("runMessage", "Sobreescribir cambios", "success");
     await loadHistory();
   } catch (error) {
-    setMessage("runMessage", `Error al guardar validacion: ${error.message}`, "error");
+    setMessage("runMessage", `Error al guardar válidación: ${error.message}`, "error");
   }
 }
 
@@ -3118,7 +3165,7 @@ async function parseUploadedFile() {
   const file = fileInput.files && fileInput.files[0];
 
   if (!file) {
-    setMessage("runMessage", "Selecciona un archivo", "error");
+    setMessage("runMessage", "Seleccióna un archivo", "error");
     return;
   }
 
@@ -3207,7 +3254,7 @@ async function createConfig() {
       body: JSON.stringify(payload),
     });
 
-    setMessage("configMessage", `Configuracion creada: ${created.id}`, "success");
+    setMessage("configMessage", `Configuración creada: ${created.id}`, "success");
     clearConfigEditor();
     await loadConfigs();
   } catch (error) {
@@ -3224,7 +3271,7 @@ async function updateConfig() {
   }
 
   if (!state.editingConfigId) {
-    setMessage("configMessage", "Carga una configuracion existente en el editor", "error");
+    setMessage("configMessage", "Carga una configuración existente en el editor", "error");
     return;
   }
 
@@ -3273,7 +3320,7 @@ async function updateConfig() {
 
     setMessage(
       "configMessage",
-      `Configuracion actualizada: ${updated.id} (version ${updated.version})`,
+      `Configuración actualizada: ${updated.id} (version ${updated.version})`,
       "success"
     );
     await loadConfigs();
@@ -3287,7 +3334,7 @@ async function updateConfig() {
 function populateCopyToBuSelect() {
   const sel = el("copyToBuSelect");
   if (!sel) return;
-  sel.innerHTML = '<option value="">Selecciona BU destino</option>';
+  sel.innerHTML = '<option value="">Seleccióna BU destino</option>';
   state.businessUnits.forEach((bu) => {
     if (String(bu.id) === state.selectedBuId) return; // skip current BU
     const opt = document.createElement("option");
@@ -3308,12 +3355,12 @@ function updateCopyToBuVisibility() {
 async function copyConfigToBu() {
   const configId = getSelectedInspectConfigId();
   if (!configId) {
-    setMessage("copyToBuMessage", "Selecciona una configuracion primero", "error");
+    setMessage("copyToBuMessage", "Seleccióna una configuración primero", "error");
     return;
   }
   const targetBuId = el("copyToBuSelect")?.value;
   if (!targetBuId) {
-    setMessage("copyToBuMessage", "Selecciona una BU destino", "error");
+    setMessage("copyToBuMessage", "Seleccióna una BU destino", "error");
     return;
   }
   const targetBu = state.businessUnits.find((b) => String(b.id) === targetBuId);
@@ -3350,7 +3397,7 @@ function addVariable() {
     description,
     required,
     type,
-    validation_regex: null,
+    válidation_regex: null,
     max_length: null,
   });
 
@@ -3365,7 +3412,7 @@ function addVariable() {
 
 function updateVariable() {
   if (state.editingVariableIndex === null) {
-    setMessage("configMessage", "Selecciona una variable para editar", "error");
+    setMessage("configMessage", "Seleccióna una variable para editar", "error");
     return;
   }
 
@@ -3432,7 +3479,7 @@ function renderHistory(rows) {
 
   if (!Array.isArray(rows) || !rows.length) {
     const tr = document.createElement("tr");
-    tr.innerHTML = '<td colspan="8" class="empty-row">No hay ejecuciones con esos filtros. Ajusta filtros o lanza una nueva extraccion.</td>';
+    tr.innerHTML = '<td colspan="8" class="empty-row">No hay ejecuciones con esos filtros. Ajusta filtros o lanza una nueva extracción.</td>';
     body.appendChild(tr);
     return;
   }
@@ -3466,7 +3513,7 @@ function renderHistory(rows) {
 
 async function openDocumentFromHistory(documentId) {
   if (!hasSession() || !state.selectedBuId) {
-    el("historyDetail").textContent = "Haz login y selecciona una BU";
+    el("historyDetail").textContent = "Haz login y seleccióna una BU";
     return;
   }
 
@@ -3500,7 +3547,7 @@ async function openDocumentFromHistory(documentId) {
 async function loadHistory() {
   if (!hasSession() || !state.selectedBuId) {
     renderHistory([]);
-    el("historyDetail").textContent = "Haz login y selecciona una BU para ver historial.";
+    el("historyDetail").textContent = "Haz login y seleccióna una BU para ver historial.";
     return;
   }
 
@@ -3523,7 +3570,7 @@ async function loadHistory() {
 
 async function loadExtractionDetail(extractionId) {
   if (!hasSession() || !state.selectedBuId) {
-    el("historyDetail").textContent = "Haz login y selecciona una BU";
+    el("historyDetail").textContent = "Haz login y seleccióna una BU";
     return;
   }
 
@@ -3560,7 +3607,7 @@ async function loadColConfigs() {
   if (!sel) return;
 
   if (!hasSession() || !state.selectedBuId) {
-    sel.innerHTML = '<option value="">Haz login y selecciona una BU</option>';
+    sel.innerHTML = '<option value="">Haz login y seleccióna una BU</option>';
     return;
   }
 
@@ -3573,7 +3620,7 @@ async function loadColConfigs() {
   if (!configs.length) {
     const opt = document.createElement("option");
     opt.value = "";
-    opt.textContent = "No hay configuraciones";
+    opt.textContent = "No hay configuraciónes";
     sel.appendChild(opt);
     return;
   }
@@ -3654,7 +3701,7 @@ async function processCollection() {
   }
   const configId = el("colConfigSelect").value;
   if (!configId) {
-    setMessage("colMessage", "Selecciona una configuracion", "error");
+    setMessage("colMessage", "Seleccióna una configuración", "error");
     return;
   }
   const rawName = el("colName").value.trim();
@@ -3717,7 +3764,7 @@ async function processCollection() {
   const ok = colState.files.filter((f) => f.status === "ok").length;
   const fail = colState.files.filter((f) => f.status === "error").length;
   setMessage("colMessage", `Completado: ${ok} OK, ${fail} errores`, ok && !fail ? "success" : "error");
-  el("colSummaryText").textContent = `${ok} extraccion(es) correctas · ${fail} error(es)`;
+  el("colSummaryText").textContent = `${ok} extracción(es) correctas · ${fail} error(es)`;
   el("colSummary").style.display = "flex";
   el("colProcessBtn").disabled = false;
   await loadColHistory();
@@ -3881,7 +3928,7 @@ function wireActions() {
   on("documentText", "input", renderDocumentPreview);
   on("cfgResponseFormat", "input", () => {
     if (state.responseFormatMode === "custom") {
-      validateResponseFormatJson(true);
+      válidateResponseFormatJson(true);
     }
     renderPromptPreview();
   });
@@ -3925,7 +3972,7 @@ function wireActions() {
     colState.files = [];
     _colFileIdCounter = 0;
     colState.collectionId = null;
-    el("colUploadLabel").textContent = "Arrastra archivos aqui o haz clic para seleccionar";
+    el("colUploadLabel").textContent = "Arrastra archivos aquí o haz clic para selecciónar";
     el("colSummary").style.display = "none";
     setMessage("colMessage", "", "");
     renderColQueue();
@@ -3990,7 +4037,7 @@ function wireActions() {
     const sel = el("assessConfigSelect");
     if (!sel || !sel.value) return;
     const already = state.assessConfigsDraft.some((c) => c.config_id === sel.value);
-    if (already) { setMessage("assessFormMessage", "Esta configuracion ya esta en la lista", "error"); return; }
+    if (already) { setMessage("assessFormMessage", "Esta configuración ya esta en la lista", "error"); return; }
     const name = sel.options[sel.selectedIndex]?.dataset.name || sel.options[sel.selectedIndex]?.text || sel.value;
     state.assessConfigsDraft.push({ config_id: sel.value, config_name: name });
     renderAssessConfigDraft();

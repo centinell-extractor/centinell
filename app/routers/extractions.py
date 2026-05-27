@@ -14,6 +14,7 @@ from sqlalchemy import select, desc
 
 from app.db.connection import get_db
 from app.db.models import Extraction, PromptConfig
+from app.dependencies.auth import AuthContext, get_bu_auth_context, require_bu_roles_with_audit
 from app.schemas.extraction import ExtractionRead, ExtractionValidateRequest
 from app.services.response_validator import validate_and_clean_response, ResponseValidationError
 
@@ -24,19 +25,29 @@ router = APIRouter(prefix="/extractions", tags=["extractions"])
 @router.get("/", response_model=List[ExtractionRead])
 async def list_extractions(
     config_id: Optional[UUID] = Query(None, description="Filtrar por config_id"),
+    document_id: Optional[UUID] = Query(None, description="Filtrar por document_id"),
     status: Optional[str] = Query(None, description="Filtrar por estado: success | failed | validated"),
     limit: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
+    auth: AuthContext = Depends(get_bu_auth_context),
 ):
     """
     Devuelve el historial de extracciones, ordenado de más reciente a más antigua.
     Permite filtrar por config_id y/o status.
     """
     try:
-        stmt = select(Extraction).order_by(desc(Extraction.created_at)).limit(limit)
+        stmt = (
+            select(Extraction)
+            .where(Extraction.bu_id == auth.bu_id)
+            .order_by(desc(Extraction.created_at))
+            .limit(limit)
+        )
 
         if config_id is not None:
             stmt = stmt.where(Extraction.prompt_config_id == config_id)
+
+        if document_id is not None:
+            stmt = stmt.where(Extraction.document_id == document_id)
 
         if status is not None:
             stmt = stmt.where(Extraction.status == status)
@@ -53,6 +64,7 @@ async def list_extractions(
 async def get_extraction(
     extraction_id: UUID,
     db: AsyncSession = Depends(get_db),
+    auth: AuthContext = Depends(get_bu_auth_context),
 ):
     """
     Devuelve el detalle completo de una extracción, incluyendo el prompt enviado
@@ -60,7 +72,10 @@ async def get_extraction(
     """
     try:
         result = await db.execute(
-            select(Extraction).where(Extraction.id == extraction_id)
+            select(Extraction).where(
+                Extraction.id == extraction_id,
+                Extraction.bu_id == auth.bu_id,
+            )
         )
         extraction = result.scalars().first()
 
@@ -81,13 +96,27 @@ async def validate_extraction(
     extraction_id: UUID,
     payload: ExtractionValidateRequest,
     db: AsyncSession = Depends(get_db),
+    auth: AuthContext = Depends(get_bu_auth_context),
 ):
     """
     Guarda la validación humana de una extracción y la marca como validated.
     """
+    await require_bu_roles_with_audit(
+        auth,
+        {"admin_global", "bu_admin", "bu_user"},
+        "No tienes permisos para validar extracciones en esta BU",
+        db,
+        action="extraction.validate",
+        resource_type="extraction",
+        resource_id=str(extraction_id),
+    )
+
     try:
         extraction_result = await db.execute(
-            select(Extraction).where(Extraction.id == extraction_id)
+            select(Extraction).where(
+                Extraction.id == extraction_id,
+                Extraction.bu_id == auth.bu_id,
+            )
         )
         extraction = extraction_result.scalars().first()
 
@@ -142,9 +171,15 @@ def _get_result_rows(extraction: Extraction) -> list[dict]:
 async def export_extraction_xlsx(
     extraction_id: UUID,
     db: AsyncSession = Depends(get_db),
+    auth: AuthContext = Depends(get_bu_auth_context),
 ):
     """Exporta una extracción individual como archivo Excel (.xlsx)."""
-    result = await db.execute(select(Extraction).where(Extraction.id == extraction_id))
+    result = await db.execute(
+        select(Extraction).where(
+            Extraction.id == extraction_id,
+            Extraction.bu_id == auth.bu_id,
+        )
+    )
     extraction = result.scalars().first()
     if not extraction:
         raise HTTPException(status_code=404, detail="Extracción no encontrada")
@@ -186,6 +221,7 @@ async def export_extractions_bulk(
     status: Optional[str] = Query(None),
     limit: int = Query(200, ge=1, le=1000),
     db: AsyncSession = Depends(get_db),
+    auth: AuthContext = Depends(get_bu_auth_context),
 ):
     """
     Exporta múltiples extracciones en formato CSV, XLSX o JSON.
@@ -195,7 +231,12 @@ async def export_extractions_bulk(
     if format not in ("csv", "xlsx", "json"):
         raise HTTPException(status_code=400, detail="Formato debe ser csv, xlsx o json")
 
-    stmt = select(Extraction).order_by(desc(Extraction.created_at)).limit(limit)
+    stmt = (
+        select(Extraction)
+        .where(Extraction.bu_id == auth.bu_id)
+        .order_by(desc(Extraction.created_at))
+        .limit(limit)
+    )
     if config_id is not None:
         stmt = stmt.where(Extraction.prompt_config_id == config_id)
     if collection_id is not None:

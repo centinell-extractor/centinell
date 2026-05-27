@@ -1,11 +1,13 @@
 # app/routers/documents.py
 import asyncio
+import base64
 from io import BytesIO
+import mimetypes
 from pathlib import Path
 import logging
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -40,6 +42,8 @@ from app.schemas.assessment import AssessmentRunRead
 from app.schemas.document import DocumentListResponse, DocumentRead
 from app.schemas.extraction import ExtractionRead
 from app.services.document_storage import DocumentStorageService
+from app.services.run_enricher import enrich_assessment_runs
+from app.services.usage_service import DOC_DELETED, DOC_UPLOADED, track_event
 
 logger = logging.getLogger(__name__)
 
@@ -47,9 +51,10 @@ router = APIRouter(prefix="/documents", tags=["documents"])
 storage_service = DocumentStorageService(DOCUMENT_STORAGE_DIR)
 
 
-def _doc_to_read(doc: Document, bu_code: str | None) -> DocumentRead:
+def _doc_to_read(doc: Document, bu_code: str | None, created_by_name: str | None = None) -> DocumentRead:
     return DocumentRead(
         id=doc.id, bu_id=doc.bu_id, bu_code=bu_code,
+        created_by_name=created_by_name,
         title=doc.title, filename=doc.filename, mime_type=doc.mime_type,
         size_bytes=doc.size_bytes, storage_key=doc.storage_key,
         created_by=doc.created_by, created_at=doc.created_at,
@@ -64,7 +69,15 @@ async def _enrich_docs(docs: list[Document], db: AsyncSession) -> list[DocumentR
         result = await db.execute(select(BusinessUnit).where(BusinessUnit.id.in_(bu_ids)))
         for bu in result.scalars().all():
             bu_codes[bu.id] = bu.code
-    return [_doc_to_read(d, bu_codes.get(d.bu_id)) for d in docs]
+
+    user_ids = {d.created_by for d in docs if d.created_by}
+    user_names: dict = {}
+    if user_ids:
+        result = await db.execute(select(User).where(User.id.in_(user_ids)))
+        for u in result.scalars().all():
+            user_names[u.id] = u.full_name or u.email
+
+    return [_doc_to_read(d, bu_codes.get(d.bu_id), user_names.get(d.created_by)) for d in docs]
 
 
 def _parse_int_csv(raw: str, default_values: list[int]) -> list[int]:
@@ -245,12 +258,18 @@ async def upload_document(
     if not bu or not bu.is_active:
         raise HTTPException(status_code=404, detail="BU no encontrada o inactiva")
 
+    raw_mime = file.content_type or "application/octet-stream"
+    if raw_mime in ("application/octet-stream", "binary/octet-stream", ""):
+        guessed, _ = mimetypes.guess_type(filename)
+        if guessed:
+            raw_mime = guessed
+
     storage_key, digest = storage_service.save(content, filename)
     document = Document(
         bu_id=auth.bu_id,
         title=filename,
         filename=filename,
-        mime_type=file.content_type or "application/octet-stream",
+        mime_type=raw_mime,
         size_bytes=len(content),
         sha256=digest,
         storage_key=storage_key,
@@ -259,6 +278,86 @@ async def upload_document(
     )
     db.add(document)
     await db.flush()
+
+    # Registrar evento de uso en la misma transacción
+    await track_event(
+        db,
+        bu_id=auth.bu_id,
+        event_type=DOC_UPLOADED,
+        user_id=auth.actor_user_id,
+        metadata={"filename": filename, "mime_type": raw_mime, "size_bytes": len(content)},
+    )
+
+    await db.commit()
+    await db.refresh(document)
+
+    background_tasks.add_task(_run_ocr_background, document.id, content, filename)
+
+    return _doc_to_read(document, bu.code)
+
+
+@router.post("/from-base64", response_model=DocumentRead, status_code=201)
+async def upload_document_base64(
+    background_tasks: BackgroundTasks,
+    payload: dict = Body(...),
+    db: AsyncSession = Depends(get_db),
+    auth: AuthContext = Depends(get_bu_auth_context),
+):
+    await require_bu_roles_with_audit(
+        auth,
+        {"admin_global", "bu_admin", "bu_user"},
+        "No tienes permisos para subir documentos en esta BU",
+        db,
+        action="document.upload",
+        resource_type="document",
+    )
+
+    filename = str(payload.get("filename") or "document")
+    b64 = payload.get("content_base64") or ""
+    if not b64:
+        raise HTTPException(status_code=400, detail="content_base64 es obligatorio")
+    try:
+        content = base64.b64decode(b64)
+    except Exception:
+        raise HTTPException(status_code=400, detail="content_base64 no es base64 válido")
+
+    if not content:
+        raise HTTPException(status_code=400, detail="El archivo está vacío")
+    if len(content) > MAX_DOCUMENT_SIZE_BYTES:
+        size_mb = MAX_DOCUMENT_SIZE_BYTES / (1024 * 1024)
+        raise HTTPException(status_code=413, detail=f"Archivo demasiado grande. Máximo: {size_mb:.1f} MB")
+
+    bu = await db.get(BusinessUnit, auth.bu_id)
+    if not bu or not bu.is_active:
+        raise HTTPException(status_code=404, detail="BU no encontrada o inactiva")
+
+    guessed, _ = mimetypes.guess_type(filename)
+    raw_mime = guessed or "application/octet-stream"
+
+    storage_key, digest = storage_service.save(content, filename)
+    document = Document(
+        bu_id=auth.bu_id,
+        title=filename,
+        filename=filename,
+        mime_type=raw_mime,
+        size_bytes=len(content),
+        sha256=digest,
+        storage_key=storage_key,
+        created_by=auth.actor_user_id,
+        status="pending",
+    )
+    db.add(document)
+    await db.flush()
+
+    # Registrar evento de uso en la misma transacción
+    await track_event(
+        db,
+        bu_id=auth.bu_id,
+        event_type=DOC_UPLOADED,
+        user_id=auth.actor_user_id,
+        metadata={"filename": filename, "mime_type": raw_mime, "size_bytes": len(content)},
+    )
+
     await db.commit()
     await db.refresh(document)
 
@@ -352,6 +451,19 @@ async def delete_document(
     if not document:
         raise HTTPException(status_code=404, detail="Documento no encontrado")
 
+    # Registrar evento antes del delete (necesitamos los datos del documento)
+    await track_event(
+        db,
+        bu_id=auth.bu_id,
+        event_type=DOC_DELETED,
+        user_id=auth.actor_user_id,
+        metadata={
+            "document_id": str(document_id),
+            "filename": document.filename,
+            "size_bytes": document.size_bytes,
+        },
+    )
+
     storage_service.delete(document.storage_key)
     await db.delete(document)
     await db.commit()
@@ -388,11 +500,11 @@ async def list_document_runs(
 @router.get("/{document_id}/assessment-runs", response_model=list[AssessmentRunRead])
 async def list_document_assessment_runs(
     document_id: UUID,
-    limit: int = 20,
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db),
     auth: AuthContext = Depends(get_bu_auth_context),
 ):
-    limit = max(1, min(limit, 100))
     doc_result = await db.execute(
         select(Document).where(Document.id == document_id, Document.bu_id == auth.bu_id)
     )
@@ -402,36 +514,11 @@ async def list_document_assessment_runs(
         select(AssessmentRun)
         .where(AssessmentRun.document_id == document_id, AssessmentRun.bu_id == auth.bu_id)
         .order_by(AssessmentRun.created_at.desc())
+        .offset(offset)
         .limit(limit)
     )
     runs = list(runs_result.scalars().all())
-
-    user_ids = {r.created_by for r in runs if r.created_by}
-    users: dict = {}
-    if user_ids:
-        u_result = await db.execute(select(User).where(User.id.in_(user_ids)))
-        for u in u_result.scalars().all():
-            users[u.id] = u
-
-    enriched = []
-    for run in runs:
-        u = users.get(run.created_by) if run.created_by else None
-        enriched.append(AssessmentRunRead(
-            id=run.id,
-            assessment_id=run.assessment_id,
-            assessment_name=run.assessment_name,
-            bu_id=run.bu_id,
-            document_id=run.document_id,
-            document_name=run.document_name,
-            created_by_id=u.id if u else None,
-            created_by_name=(u.full_name or u.email) if u else None,
-            status=run.status,
-            combined_result=run.combined_result,
-            error_message=run.error_message,
-            latency_ms=run.latency_ms,
-            created_at=run.created_at,
-        ))
-    return enriched
+    return await enrich_assessment_runs(runs, db)
 
 
 def _decode_text_bytes(content: bytes) -> str:

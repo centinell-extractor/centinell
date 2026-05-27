@@ -8,6 +8,8 @@ from datetime import datetime
 class ExtractionRead(BaseModel):
     id: UUID
     prompt_config_id: UUID
+    bu_id: Optional[UUID]
+    document_id: Optional[UUID]
     collection_id: Optional[UUID]
     document_name: Optional[str]
     document_hash: Optional[str]

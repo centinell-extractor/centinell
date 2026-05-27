@@ -11,7 +11,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.connection import AsyncSessionLocal, get_db
-from app.db.models import Assessment, AssessmentConfig, AssessmentRun, PromptConfig, User
+from app.db.models import Assessment, AssessmentConfig, AssessmentRun, PromptConfig
 from app.dependencies.auth import AuthContext, get_bu_auth_context, require_bu_roles_with_audit
 from app.schemas.assessment import (
     AssessmentCreate,
@@ -22,6 +22,7 @@ from app.schemas.assessment import (
     ConfigBrief,
 )
 from app.services.llm_client import call_llm_for_extraction_chained
+from app.services.run_enricher import enrich_assessment_runs
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/assessments", tags=["assessments"])
@@ -55,35 +56,6 @@ async def _load_assessment_with_configs(db: AsyncSession, assessment_id: UUID, b
         created_at=assessment.created_at,
         configs=configs,
     )
-
-
-async def _enrich_runs(runs: list[AssessmentRun], db: AsyncSession) -> list[AssessmentRunRead]:
-    user_ids = {r.created_by for r in runs if r.created_by}
-    users: dict = {}
-    if user_ids:
-        result = await db.execute(select(User).where(User.id.in_(user_ids)))
-        for u in result.scalars().all():
-            users[u.id] = u
-
-    out = []
-    for run in runs:
-        u = users.get(run.created_by) if run.created_by else None
-        out.append(AssessmentRunRead(
-            id=run.id,
-            assessment_id=run.assessment_id,
-            assessment_name=run.assessment_name,
-            bu_id=run.bu_id,
-            document_id=run.document_id,
-            document_name=run.document_name,
-            created_by_id=u.id if u else None,
-            created_by_name=(u.full_name or u.email) if u else None,
-            status=run.status,
-            combined_result=run.combined_result,
-            error_message=run.error_message,
-            latency_ms=run.latency_ms,
-            created_at=run.created_at,
-        ))
-    return out
 
 
 async def _run_assessment_background(
@@ -155,30 +127,42 @@ async def list_assessments(
     db: AsyncSession = Depends(get_db),
     auth: AuthContext = Depends(get_bu_auth_context),
 ):
+    # 1ª query: todos los assessments de la BU
     result = await db.execute(
         select(Assessment)
         .where(Assessment.bu_id == auth.bu_id, Assessment.is_active.is_(True))
         .order_by(Assessment.created_at.desc())
     )
     assessments = result.scalars().all()
+    if not assessments:
+        return []
 
-    out = []
-    for a in assessments:
-        cfg_result = await db.execute(
-            select(AssessmentConfig, PromptConfig)
-            .join(PromptConfig, PromptConfig.id == AssessmentConfig.config_id)
-            .where(AssessmentConfig.assessment_id == a.id)
-            .order_by(AssessmentConfig.position)
-        )
-        configs = [
+    # 2ª query: todas las configs de todos los assessments a la vez (sin N+1)
+    assessment_ids = [a.id for a in assessments]
+    cfg_result = await db.execute(
+        select(AssessmentConfig, PromptConfig)
+        .join(PromptConfig, PromptConfig.id == AssessmentConfig.config_id)
+        .where(AssessmentConfig.assessment_id.in_(assessment_ids))
+        .order_by(AssessmentConfig.assessment_id, AssessmentConfig.position)
+    )
+    configs_by_assessment: dict[UUID, list[ConfigBrief]] = {}
+    for ac, pc in cfg_result.all():
+        configs_by_assessment.setdefault(ac.assessment_id, []).append(
             ConfigBrief(config_id=ac.config_id, config_name=pc.name, position=ac.position)
-            for ac, pc in cfg_result.all()
-        ]
-        out.append(AssessmentRead(
-            id=a.id, bu_id=a.bu_id, name=a.name, description=a.description,
-            is_active=a.is_active, created_at=a.created_at, configs=configs,
-        ))
-    return out
+        )
+
+    return [
+        AssessmentRead(
+            id=a.id,
+            bu_id=a.bu_id,
+            name=a.name,
+            description=a.description,
+            is_active=a.is_active,
+            created_at=a.created_at,
+            configs=configs_by_assessment.get(a.id, []),
+        )
+        for a in assessments
+    ]
 
 
 @router.post("/", response_model=AssessmentRead, status_code=201)
@@ -222,7 +206,7 @@ async def get_assessment_run(
     run = await db.get(AssessmentRun, run_id)
     if not run or run.bu_id != auth.bu_id:
         raise HTTPException(status_code=404, detail="Ejecucion no encontrada")
-    enriched = await _enrich_runs([run], db)
+    enriched = await enrich_assessment_runs([run], db)
     return enriched[0]
 
 
@@ -437,23 +421,24 @@ async def run_assessment(
     background_tasks.add_task(
         _run_assessment_background, run.id, payload.document_text, config_entries
     )
-    enriched = await _enrich_runs([run], db)
+    enriched = await enrich_assessment_runs([run], db)
     return enriched[0]
 
 
 @router.get("/{assessment_id}/runs", response_model=list[AssessmentRunRead])
 async def list_assessment_runs(
     assessment_id: UUID,
-    limit: int = 20,
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db),
     auth: AuthContext = Depends(get_bu_auth_context),
 ):
-    limit = max(1, min(limit, 100))
     result = await db.execute(
         select(AssessmentRun)
         .where(AssessmentRun.assessment_id == assessment_id, AssessmentRun.bu_id == auth.bu_id)
         .order_by(AssessmentRun.created_at.desc())
+        .offset(offset)
         .limit(limit)
     )
     runs = list(result.scalars().all())
-    return await _enrich_runs(runs, db)
+    return await enrich_assessment_runs(runs, db)

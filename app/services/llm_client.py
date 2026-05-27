@@ -10,7 +10,7 @@ from app.config import (
     LLM_RETRY_ATTEMPTS,
     LLM_RETRY_DELAY_SECONDS
 )
-from app.services.template_engine import build_final_prompt
+from app.services.template_engine import build_final_prompt, parse_var_refs
 from app.services.response_validator import validate_and_clean_response, ResponseValidationError
 import logging
 
@@ -28,6 +28,11 @@ class LLMExtractionResult(TypedDict):
     prompt_sent: str
     raw_llm_response: str
     cleaned: List[Dict[str, Any]]
+    # Conteo de tokens OpenAI (para tracking de uso y costes)
+    prompt_tokens: int
+    completion_tokens: int
+    total_tokens: int
+    model_used: str
 
 
 def _extract_api_error_message(resp: httpx.Response) -> str:
@@ -76,6 +81,12 @@ async def call_llm_for_extraction(
         timeout_seconds = 10
 
     final_prompt = build_final_prompt(variables, base_prompt=base_prompt)
+    final_prompt = (
+        f"{final_prompt}\n\n"
+        "REQUISITO DE COMPATIBILIDAD: En cada item del JSON incluye tambien:\n"
+        "- 'reasoning': explicacion breve (1-2 frases) de por que elegiste ese valor; null si no aplica\n"
+        "- 'source_quote': cita LITERAL del texto (maximo 250 caracteres) en que te basaste; null si no aplica"
+    )
 
     system_message = {
         "role": "system",
@@ -185,11 +196,18 @@ async def call_llm_for_extraction(
             except ResponseValidationError as e:
                 raise LLMExtractionError(f"Respuesta del LLM inválida: {e}") from e
 
+            # Capturar uso de tokens (disponible en todas las respuestas de la API)
+            usage = data.get("usage") or {}
+
             # Éxito - retornar resultado
             return LLMExtractionResult(
                 prompt_sent=final_prompt,
                 raw_llm_response=content,
                 cleaned=cleaned,
+                prompt_tokens=int(usage.get("prompt_tokens", 0)),
+                completion_tokens=int(usage.get("completion_tokens", 0)),
+                total_tokens=int(usage.get("total_tokens", 0)),
+                model_used=model,
             )
 
         except (httpx.TimeoutException, asyncio.TimeoutError) as e:
@@ -214,3 +232,123 @@ async def call_llm_for_extraction(
 
     # Si llegamos aquí, todos los reintentos fallaron
     raise LLMExtractionError(f"Falló extracción LLM después de {LLM_RETRY_ATTEMPTS} intentos: {str(last_error)}")
+
+
+def _toposort_rounds(variables: List[Dict[str, Any]]) -> List[List[Dict[str, Any]]]:
+    """
+    Ordena las variables en rondas de ejecución según sus dependencias {{VarName}}.
+    Las variables sin dependencias van en la primera ronda; las dependientes, después.
+    Lanza ValueError si hay dependencias circulares.
+    """
+    known = {v["name"] for v in variables}
+    by_name = {v["name"]: v for v in variables}
+
+    deps = {
+        v["name"]: parse_var_refs(v.get("description", ""), known) - {v["name"]}
+        for v in variables
+    }
+    in_degree = {name: len(d) for name, d in deps.items()}
+
+    rounds: List[List[Dict[str, Any]]] = []
+    resolved: set = set()
+
+    while len(resolved) < len(variables):
+        current_names = [
+            name for name in by_name
+            if name not in resolved and in_degree[name] == 0
+        ]
+        if not current_names:
+            raise ValueError("Dependencias circulares detectadas entre variables")
+
+        rounds.append([by_name[name] for name in current_names])
+        for name in current_names:
+            resolved.add(name)
+            for other_name, other_deps in deps.items():
+                if name in other_deps and other_name not in resolved:
+                    in_degree[other_name] -= 1
+
+    return rounds
+
+
+async def call_llm_for_extraction_chained(
+    document_text: str,
+    variables: List[Dict[str, Any]],
+    model: str = DEFAULT_MODEL,
+    base_prompt: Optional[str] = None,
+    timeout_seconds: Optional[int] = None,
+) -> LLMExtractionResult:
+    """
+    Versión encadenada de call_llm_for_extraction.
+    Si alguna variable referencia a otra via {{NombreVar}} en su descripción,
+    las ejecuta en rondas secuenciales interpolando las respuestas previas.
+    Si no hay dependencias, delega directamente a call_llm_for_extraction (sin overhead).
+    """
+    known_names = {v["name"] for v in variables}
+    has_deps = any(
+        parse_var_refs(v.get("description", ""), known_names)
+        for v in variables
+    )
+
+    if not has_deps:
+        return await call_llm_for_extraction(
+            document_text, variables, model, base_prompt, timeout_seconds
+        )
+
+    rounds = _toposort_rounds(variables)
+    logger.info(
+        "Extracción encadenada: %d variables en %d rondas.",
+        len(variables),
+        len(rounds),
+    )
+
+    all_results: List[Dict[str, Any]] = []
+    resolved_answers: Dict[str, Any] = {}
+    all_prompts: List[str] = []
+    all_raw: List[str] = []
+    total_prompt_tokens = 0
+    total_completion_tokens = 0
+    total_tokens = 0
+
+    for round_idx, round_vars in enumerate(rounds):
+        # Interpolar respuestas anteriores en las descripciones de esta ronda
+        interpolated = []
+        for v in round_vars:
+            desc = v.get("description", "")
+            for ref_name, ref_answer in resolved_answers.items():
+                desc = desc.replace(f"{{{{{ref_name}}}}}", str(ref_answer) if ref_answer is not None else "null")
+            interpolated.append({**v, "description": desc})
+
+        logger.info(
+            "Ronda %d/%d: extrayendo %s",
+            round_idx + 1,
+            len(rounds),
+            [v["name"] for v in interpolated],
+        )
+
+        round_result = await call_llm_for_extraction(
+            document_text, interpolated, model, base_prompt, timeout_seconds
+        )
+
+        all_prompts.append(round_result["prompt_sent"])
+        all_raw.append(round_result["raw_llm_response"])
+        total_prompt_tokens     += round_result.get("prompt_tokens", 0)
+        total_completion_tokens += round_result.get("completion_tokens", 0)
+        total_tokens            += round_result.get("total_tokens", 0)
+
+        for item in round_result["cleaned"]:
+            all_results.append(item)
+            resolved_answers[item["title"]] = item.get("answer")
+
+    # Preservar el orden original de las variables
+    original_order = {v["name"]: i for i, v in enumerate(variables)}
+    all_results.sort(key=lambda x: original_order.get(x["title"], 999))
+
+    return LLMExtractionResult(
+        prompt_sent="\n\n--- RONDA SIGUIENTE ---\n\n".join(all_prompts),
+        raw_llm_response="\n\n--- RONDA SIGUIENTE ---\n\n".join(all_raw),
+        cleaned=all_results,
+        prompt_tokens=total_prompt_tokens,
+        completion_tokens=total_completion_tokens,
+        total_tokens=total_tokens,
+        model_used=model,
+    )

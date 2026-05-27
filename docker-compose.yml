@@ -1,0 +1,77 @@
+services:
+
+  # ── Aplicación principal ───────────────────────────────────────────────────
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - centinell_storage:/app/storage
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # ── Metabase (analytics) — perfil opcional ─────────────────────────────────
+  # Arrancar con:  docker compose --profile analytics up
+  #
+  # Acceso: http://localhost:3000
+  # Primera vez: seguir el wizard de setup y añadir la conexión a PostgreSQL:
+  #   Host: la IP/host de tu PostgreSQL (no "localhost" — usar IP pública o
+  #         host.docker.internal en Mac/Win)
+  #   Database: centinell (o el nombre en tu DATABASE_URL)
+  #   User/Pass: los de tu DATABASE_URL
+  #
+  # Para producción (Fly.io): desplegar metabase como app separada o usar
+  # Metabase Cloud (metabase.com/start) conectado al Postgres de Fly.io.
+  metabase:
+    image: metabase/metabase:v0.50.21
+    profiles:
+      - analytics
+    ports:
+      - "3000:3000"
+    environment:
+      MB_DB_TYPE: postgres
+      MB_DB_HOST: metabase-db
+      MB_DB_PORT: 5432
+      MB_DB_DBNAME: metabase
+      MB_DB_USER: metabase
+      MB_DB_PASS: metabase_secret
+      JAVA_TIMEZONE: Europe/Madrid
+    depends_on:
+      metabase-db:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  metabase-db:
+    image: postgres:16-alpine
+    profiles:
+      - analytics
+    environment:
+      POSTGRES_DB: metabase
+      POSTGRES_USER: metabase
+      POSTGRES_PASSWORD: metabase_secret
+    volumes:
+      - metabase_db:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U metabase"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+
+volumes:
+  centinell_storage:
+  metabase_db:

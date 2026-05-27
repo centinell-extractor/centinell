@@ -1,5 +1,5 @@
 # app/db/models.py
-from sqlalchemy import Column, String, Integer, Boolean, Text, JSON, TIMESTAMP, func, ForeignKey, Float, Index, UniqueConstraint
+from sqlalchemy import BigInteger, Column, String, Integer, Boolean, Text, JSON, TIMESTAMP, func, ForeignKey, Float, Index, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 import uuid
 
@@ -10,11 +10,13 @@ class Collection(Base):
     __tablename__ = "collections"
 
     id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    bu_id = Column(PG_UUID(as_uuid=True), ForeignKey("business_units.id", ondelete="CASCADE"), nullable=False)
     name = Column(String(200), nullable=False)
     config_id = Column(PG_UUID(as_uuid=True), ForeignKey("prompt_configs.id"), nullable=False)
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
 
     __table_args__ = (
+        Index("idx_collection_bu", "bu_id"),
         Index("idx_collection_config", "config_id"),
         Index("idx_collection_created", "created_at"),
     )
@@ -56,7 +58,7 @@ class Extraction(Base):
     )
     prompt_config_id = Column(
         PG_UUID(as_uuid=True),
-        ForeignKey("prompt_configs.id"),
+        ForeignKey("prompt_configs.id", ondelete="RESTRICT"),
         nullable=False
     )
     bu_id = Column(PG_UUID(as_uuid=True), ForeignKey("business_units.id", ondelete="SET NULL"), nullable=True)
@@ -154,6 +156,7 @@ class AssessmentRun(Base):
     error_message = Column(Text, nullable=True)
     latency_ms = Column(Integer, nullable=True)
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+    updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
 
     __table_args__ = (
         Index("idx_assessment_run_assessment", "assessment_id"),
@@ -237,6 +240,78 @@ class ApiKey(Base):
     __table_args__ = (
         Index("idx_api_keys_bu", "bu_id"),
         Index("idx_api_keys_hash", "key_hash"),
+    )
+
+
+class UsageEvent(Base):
+    """
+    Registro granular de eventos de uso por BU.
+    Append-only: nunca se actualiza ni elimina, sólo se inserta.
+    Es la fuente de verdad para informes de consumo y futura facturación.
+    """
+    __tablename__ = "usage_events"
+
+    id         = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    bu_id      = Column(PG_UUID(as_uuid=True), ForeignKey("business_units.id", ondelete="CASCADE"), nullable=False)
+    user_id    = Column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    event_type = Column(String(64), nullable=False)
+    quantity   = Column(BigInteger, nullable=False, default=1)
+    # 'payload' en Python → columna 'metadata' en DB (evita colisión con SQLAlchemy)
+    payload    = Column("metadata", JSON, nullable=True)
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        Index("idx_usage_events_bu_created", "bu_id", "created_at"),
+        Index("idx_usage_events_bu_type",    "bu_id", "event_type"),
+        Index("idx_usage_events_created",    "created_at"),
+    )
+
+
+class Plan(Base):
+    """
+    Catálogo de planes comerciales.
+    Los límites NULL significan ilimitado (plan enterprise).
+    price_monthly_cents: precio en céntimos (€), 0 = gratuito.
+    """
+    __tablename__ = "plans"
+
+    id                        = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    code                      = Column(String(40),  nullable=False, unique=True)
+    display_name              = Column(String(128), nullable=False)
+    max_docs_per_month        = Column(Integer,    nullable=True)   # NULL = ilimitado
+    max_extractions_per_month = Column(Integer,    nullable=True)
+    max_tokens_per_month      = Column(BigInteger, nullable=True)
+    max_users                 = Column(Integer,    nullable=True)
+    price_monthly_cents       = Column(Integer,    nullable=False, default=0)
+    is_active                 = Column(Boolean,    nullable=False, default=True)
+    created_at                = Column(TIMESTAMP(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        Index("idx_plans_code",      "code"),
+        Index("idx_plans_is_active", "is_active"),
+    )
+
+
+class BUPlan(Base):
+    """
+    Asignación de plan a BU con historial completo.
+    Plan activo: ends_at IS NULL.
+    Cuando se cambia el plan se cierra el anterior (ends_at = now())
+    y se crea un nuevo registro con el nuevo plan.
+    """
+    __tablename__ = "bu_plans"
+
+    id         = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    bu_id      = Column(PG_UUID(as_uuid=True), ForeignKey("business_units.id", ondelete="CASCADE"), nullable=False)
+    plan_id    = Column(PG_UUID(as_uuid=True), ForeignKey("plans.id"),                              nullable=False)
+    starts_at  = Column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
+    ends_at    = Column(TIMESTAMP(timezone=True), nullable=True)    # NULL = plan vigente
+    created_by = Column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        Index("idx_bu_plans_bu",     "bu_id"),
+        Index("idx_bu_plans_active", "bu_id", "starts_at"),
     )
 
 

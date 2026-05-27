@@ -1,27 +1,49 @@
 # app/routers/collections.py
 import io
+import json
 import logging
-from typing import List, Optional
+from typing import List
 from uuid import UUID
 
 import openpyxl
 import openpyxl.utils
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
-from sqlalchemy import select, desc, func, case
+from sqlalchemy import case, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.connection import get_db
-from app.db.models import Collection, PromptConfig, Extraction
+from app.db.models import Collection, Extraction, PromptConfig
+from app.dependencies.auth import AuthContext, get_bu_auth_context, require_bu_roles_with_audit
 from app.schemas.collection import CollectionCreate, CollectionRead
-from app.schemas.extraction import ExtractionRead
+from app.services.usage_service import COLLECTION_EXPORT, track_event
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/collections", tags=["collections"])
 
 
+def _build_collection_read(
+    collection: Collection,
+    total_docs: int,
+    success_count: int,
+    failed_count: int,
+    validated_count: int,
+) -> CollectionRead:
+    return CollectionRead(
+        id=collection.id,
+        bu_id=collection.bu_id,
+        name=collection.name,
+        config_id=collection.config_id,
+        created_at=collection.created_at,
+        total_docs=total_docs,
+        success_count=success_count,
+        failed_count=failed_count,
+        validated_count=validated_count,
+    )
+
+
 async def _collection_with_counts(collection: Collection, db: AsyncSession) -> CollectionRead:
-    """Adjunta conteos de extracciones a un objeto Collection."""
+    """Adjunta conteos de extracciones a un objeto Collection (uso en operaciones de un solo ítem)."""
     counts = await db.execute(
         select(
             func.count().label("total"),
@@ -31,31 +53,43 @@ async def _collection_with_counts(collection: Collection, db: AsyncSession) -> C
         ).where(Extraction.collection_id == collection.id)
     )
     row = counts.one()
-    return CollectionRead(
-        id=collection.id,
-        name=collection.name,
-        config_id=collection.config_id,
-        created_at=collection.created_at,
-        total_docs=row.total,
-        success_count=row.success_count,
-        failed_count=row.failed_count,
-        validated_count=row.validated_count,
+    return _build_collection_read(
+        collection, row.total, row.success_count, row.failed_count, row.validated_count
     )
 
 
 @router.post("/", response_model=CollectionRead, status_code=201)
-async def create_collection(payload: CollectionCreate, db: AsyncSession = Depends(get_db)):
+async def create_collection(
+    payload: CollectionCreate,
+    db: AsyncSession = Depends(get_db),
+    auth: AuthContext = Depends(get_bu_auth_context),
+):
     """Crea una nueva colección (agrupador de extracciones en lote)."""
+
+    await require_bu_roles_with_audit(
+        auth,
+        {"admin_global", "bu_admin", "bu_user"},
+        "No tienes permisos para crear colecciones en esta BU",
+        db,
+        action="collection.create",
+        resource_type="collection",
+    )
+
     config_result = await db.execute(
         select(PromptConfig).where(
             PromptConfig.id == payload.config_id,
             PromptConfig.is_active.is_(True),
+            PromptConfig.bu_id == auth.bu_id,
         )
     )
     if not config_result.scalars().first():
         raise HTTPException(status_code=404, detail="Configuración de prompt no encontrada o inactiva")
 
-    collection = Collection(name=payload.name.strip(), config_id=payload.config_id)
+    collection = Collection(
+        bu_id=auth.bu_id,
+        name=payload.name.strip(),
+        config_id=payload.config_id,
+    )
     db.add(collection)
     await db.commit()
     await db.refresh(collection)
@@ -66,33 +100,61 @@ async def create_collection(payload: CollectionCreate, db: AsyncSession = Depend
 async def list_collections(
     limit: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
+    auth: AuthContext = Depends(get_bu_auth_context),
 ):
-    """Lista colecciones ordenadas de más reciente a más antigua."""
-    result = await db.execute(
-        select(Collection).order_by(desc(Collection.created_at)).limit(limit)
+    """Lista colecciones ordenadas de más reciente a más antigua con sus conteos en una sola query."""
+    stmt = (
+        select(
+            Collection,
+            func.count(Extraction.id).label("total_docs"),
+            func.count(case((Extraction.status == "success", 1))).label("success_count"),
+            func.count(case((Extraction.status == "failed", 1))).label("failed_count"),
+            func.count(case((Extraction.status == "validated", 1))).label("validated_count"),
+        )
+        .outerjoin(Extraction, Extraction.collection_id == Collection.id)
+        .where(Collection.bu_id == auth.bu_id)
+        .group_by(Collection.id)
+        .order_by(desc(Collection.created_at))
+        .limit(limit)
     )
-    collections = result.scalars().all()
-    return [await _collection_with_counts(c, db) for c in collections]
+    rows = (await db.execute(stmt)).all()
+    return [
+        _build_collection_read(row.Collection, row.total_docs, row.success_count, row.failed_count, row.validated_count)
+        for row in rows
+    ]
 
 
 @router.get("/{collection_id}", response_model=CollectionRead)
-async def get_collection(collection_id: UUID, db: AsyncSession = Depends(get_db)):
+async def get_collection(
+    collection_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    auth: AuthContext = Depends(get_bu_auth_context),
+):
     """Devuelve detalle de una colección con conteos."""
-    result = await db.execute(select(Collection).where(Collection.id == collection_id))
+    result = await db.execute(
+        select(Collection).where(
+            Collection.id == collection_id,
+            Collection.bu_id == auth.bu_id,
+        )
+    )
     collection = result.scalars().first()
     if not collection:
         raise HTTPException(status_code=404, detail="Colección no encontrada")
     return await _collection_with_counts(collection, db)
 
 
-@router.get("/{collection_id}/extractions", response_model=List[ExtractionRead])
+@router.get("/{collection_id}/extractions")
 async def get_collection_extractions(
     collection_id: UUID,
     db: AsyncSession = Depends(get_db),
+    auth: AuthContext = Depends(get_bu_auth_context),
 ):
     """Lista todas las extracciones de una colección."""
     result = await db.execute(
-        select(Collection).where(Collection.id == collection_id)
+        select(Collection).where(
+            Collection.id == collection_id,
+            Collection.bu_id == auth.bu_id,
+        )
     )
     if not result.scalars().first():
         raise HTTPException(status_code=404, detail="Colección no encontrada")
@@ -109,12 +171,18 @@ async def get_collection_extractions(
 async def export_collection_xlsx(
     collection_id: UUID,
     db: AsyncSession = Depends(get_db),
+    auth: AuthContext = Depends(get_bu_auth_context),
 ):
     """
     Exporta toda la colección como Excel.
     Cada fila = un documento. Cada columna = un campo extraído.
     """
-    result = await db.execute(select(Collection).where(Collection.id == collection_id))
+    result = await db.execute(
+        select(Collection).where(
+            Collection.id == collection_id,
+            Collection.bu_id == auth.bu_id,
+        )
+    )
     collection = result.scalars().first()
     if not collection:
         raise HTTPException(status_code=404, detail="Colección no encontrada")
@@ -133,7 +201,6 @@ async def export_collection_xlsx(
     for ext in extractions:
         data = ext.validated_result or []
         if not data and ext.raw_llm_response:
-            import json
             try:
                 parsed = json.loads(ext.raw_llm_response)
                 if isinstance(parsed, list):
@@ -171,6 +238,21 @@ async def export_collection_xlsx(
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
+
+    # Registrar evento de exportación
+    await track_event(
+        db,
+        bu_id=auth.bu_id,
+        event_type=COLLECTION_EXPORT,
+        user_id=auth.actor_user_id,
+        metadata={
+            "collection_id": str(collection_id),
+            "collection_name": collection.name,
+            "format": "xlsx",
+            "rows": len(records),
+        },
+    )
+    await db.commit()
 
     safe_name = "".join(c if c.isalnum() or c in "-_." else "_" for c in collection.name)
     return StreamingResponse(

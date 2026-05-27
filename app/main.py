@@ -1,11 +1,14 @@
 # app/main.py
 import logging
 import os
+from contextlib import asynccontextmanager
 from pathlib import Path
+
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+
 from app.bootstrap import ensure_bootstrap_admin
 from app.db.connection import AsyncSessionLocal, init_models
 from app.routers import prompt_configs
@@ -18,6 +21,7 @@ from app.routers import bus
 from app.routers import admin
 from app.routers import assessments
 from app.routers import api_keys
+from app.routers import reports
 
 # Configurar logging
 logging.basicConfig(
@@ -26,11 +30,32 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Gestiona el ciclo de vida de la aplicación (startup / shutdown)."""
+    # init_models crea tablas que falten (safety net para dev).
+    # En producción, ejecutar: alembic upgrade head
+    _debug = os.getenv("DEBUG", "").lower() in {"1", "true", "yes"}
+    if _debug:
+        await init_models()
+    else:
+        logger.info("Modo producción: omitiendo create_all automático (usar alembic upgrade head)")
+
+    async with AsyncSessionLocal() as session:
+        await ensure_bootstrap_admin(session)
+
+    logger.info("Aplicación iniciada correctamente")
+    yield
+    # Espacio para cleanup al apagar (cerrar conexiones externas, etc.)
+
+
 app = FastAPI(
     title="Centinell - Extraction Service",
     docs_url="/api/docs",
     redoc_url="/api/redoc",
     openapi_url="/api/openapi.json",
+    lifespan=lifespan,
 )
 
 # CORS — sólo orígenes explícitos (vacío = sólo mismo origen, que es el caso normal)
@@ -57,6 +82,7 @@ async def security_headers(request: Request, call_next):
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     return response
 
+
 static_dir = Path(__file__).resolve().parent / "static"
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
@@ -71,6 +97,7 @@ app.include_router(bus.router)
 app.include_router(admin.router)
 app.include_router(assessments.router)
 app.include_router(api_keys.router)
+app.include_router(reports.router)
 
 
 @app.get("/")
@@ -82,7 +109,7 @@ async def root():
 async def favicon():
     return FileResponse(static_dir / "favicon.svg", media_type="image/svg+xml")
 
-# Global exception handler para errores no controlados
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     logger.exception(f"Error no controlado en {request.url.path}")
@@ -106,18 +133,6 @@ async def health_check():
         "service": "Centinell",
         "version": "1.0.0"
     }
-
-
-@app.on_event("startup")
-async def startup_event():
-    # init_models crea tablas que falten (safety net para dev).
-    # En producción, ejecutar: alembic upgrade head
-    await init_models()
-
-    async with AsyncSessionLocal() as session:
-        await ensure_bootstrap_admin(session)
-
-    logger.info("Aplicación iniciada correctamente")
 
 
 @app.get("/{full_path:path}", include_in_schema=False)

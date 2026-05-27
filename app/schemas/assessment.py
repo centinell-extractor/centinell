@@ -59,6 +59,7 @@ class AssessmentRunRead(BaseModel):
     error_message: Optional[str]
     latency_ms: Optional[int]
     created_at: datetime
+    updated_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
 

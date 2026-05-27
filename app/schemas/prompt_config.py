@@ -21,6 +21,7 @@ class PromptConfigCreate(BaseModel):
 
 class PromptConfigRead(BaseModel):
     id: UUID
+    bu_id: UUID
     name: str
     description: Optional[str]
     version: int

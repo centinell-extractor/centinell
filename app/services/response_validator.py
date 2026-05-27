@@ -1,5 +1,5 @@
 # app/services/response_validator.py
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 
 class ResponseValidationError(Exception):
@@ -12,7 +12,7 @@ def validate_and_clean_response(
 ) -> List[Dict[str, Any]]:
     """
     Valida que la respuesta del modelo:
-    - Sea una lista de objetos {title, answer}
+    - Sea una lista de objetos {title, answer, reasoning?}
     - Solo contenga titles esperados
     - Limpia y normaliza answer según el tipo de variable
     """
@@ -31,6 +31,8 @@ def validate_and_clean_response(
 
         title = item.get("title")
         answer = item.get("answer")
+        reasoning = item.get("reasoning")
+        source_quote = item.get("source_quote")
 
         if title is None:
             raise ResponseValidationError("Falta el campo 'title' en algún elemento.")
@@ -58,7 +60,22 @@ def validate_and_clean_response(
                 if max_length is not None and isinstance(answer, str):
                     answer = answer[:max_length]
 
-        cleaned.append({"title": title, "answer": answer})
+        if isinstance(reasoning, str):
+            reasoning = reasoning.strip() or None
+        elif reasoning is not None:
+            reasoning = str(reasoning)
+
+        if isinstance(source_quote, str):
+            source_quote = source_quote.strip()[:300] or None
+        elif source_quote is not None:
+            source_quote = str(source_quote)[:300]
+
+        cleaned_item: Dict[str, Any] = {"title": title, "answer": answer}
+        if reasoning is not None:
+            cleaned_item["reasoning"] = reasoning
+        if source_quote is not None:
+            cleaned_item["source_quote"] = source_quote
+        cleaned.append(cleaned_item)
 
     # Comprobar que todos los required tienen entrada (aunque sea null)
     for name, var_def in var_by_name.items():
@@ -70,7 +87,7 @@ def validate_and_clean_response(
     return cleaned
 
 
-def _normalize_number(value: Any) -> float:
+def _normalize_number(value: Any) -> Optional[float]:
     """
     Intenta normalizar un número que puede venir como string con coma o punto.
     Ejemplos:
@@ -78,6 +95,9 @@ def _normalize_number(value: Any) -> float:
     - '1234,56' -> 1234.56
     - '1234.56' -> 1234.56
     """
+    if value is None:
+        return None
+
     if isinstance(value, (int, float)):
         return float(value)
 
@@ -86,6 +106,8 @@ def _normalize_number(value: Any) -> float:
 
     # Eliminar espacios
     v = value.strip()
+    if v.lower() in {"null", "none", "n/a", "na", "-"}:
+        return None
 
     # Detectar formato:
     # - Ambos '.' y ',': formato europeo  '1.234,56' -> '1234.56'

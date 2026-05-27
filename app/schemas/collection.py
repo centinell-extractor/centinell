@@ -12,6 +12,7 @@ class CollectionCreate(BaseModel):
 
 class CollectionRead(BaseModel):
     id: UUID
+    bu_id: UUID
     name: str
     config_id: UUID
     created_at: datetime

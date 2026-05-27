@@ -4,6 +4,15 @@ from typing import List, Dict, Any, Optional
 
 
 PLACEHOLDER_PATTERN = re.compile(r"\{\{\s*[^{}]+\s*\}\}")
+_VAR_REF_RE = re.compile(r"\{\{(\w+)\}\}")
+
+
+def parse_var_refs(description: str, known_names: set) -> set:
+    """
+    Devuelve los nombres de variables referenciadas en una descripción via {{NombreVar}},
+    filtrando solo los que existen en known_names.
+    """
+    return {m for m in _VAR_REF_RE.findall(description or "") if m in known_names}
 
 
 def build_variable_block(variables: List[Dict[str, Any]]) -> str:
@@ -38,10 +47,11 @@ def build_base_prompt() -> str:
         "- Respeta las reglas de validación descritas para cada campo.\n\n"
         "FORMATO DE SALIDA:\n"
         "Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:\n"
-        "[{\"title\": \"NombreVariable\", \"answer\": \"valor\"}]\n"
+        "[{\"title\": \"NombreVariable\", \"answer\": \"valor\", \"reasoning\": \"evidencia breve del documento\"}]\n"
+        "- Si no hay evidencia suficiente para explicar el valor, usa reasoning = null\n"
         "- IMPORTANTE: No uses markdown, sin ``` ni ```json\n"
         "- Devuelve SOLO el JSON, sin texto antes ni después\n"
-        "- Ejemplo correcto: [{\"title\": \"NIF\", \"answer\": \"12345678X\"}]\n"
+        "- Ejemplo correcto: [{\"title\": \"NIF\", \"answer\": \"12345678X\", \"reasoning\": \"Aparece junto a 'NIF emisor' en el encabezado\"}]\n"
         "- Ejemplo INCORRECTO: ```json [{...}] ```\n"
     )
 
