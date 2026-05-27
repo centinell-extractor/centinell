@@ -297,6 +297,8 @@ body {
   min-width: 0;
   width: auto;
   max-width: 200px;
+  /* override global width:100% for this special select */
+  flex: 1;
 }
 
 .bu-switcher select:focus {
@@ -634,6 +636,9 @@ input, select, textarea {
   background: var(--surface);
   color: var(--text-1);
   font-size: 0.84rem;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   transition: border-color 120ms ease, box-shadow 120ms ease;
 }
 
@@ -749,6 +754,12 @@ button.danger:hover {
 
 .grid-2 > label, .grid-3 > label,
 .run-form-col > label { margin-bottom: 0; }
+
+/* Evitar desbordamiento en items de grid/flex */
+.grid-2 > *, .grid-3 > *,
+.run-form-col > *,
+.collections-setup > *,
+.assess-config-add-row > * { min-width: 0; }
 
 .run-form-col {
   display: flex;

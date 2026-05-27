@@ -2583,19 +2583,19 @@ async function loadConfigs() {
 
     const option = document.createElement("option");
     option.value = cfgId;
-    option.textContent = `${cfg.name} (${cfg.id})`;
+    option.textContent = cfg.name;
     select.appendChild(option);
 
     const inspectOption = document.createElement("option");
     inspectOption.value = String(index);
     inspectOption.dataset.configId = cfgId;
-    inspectOption.textContent = `${cfg.name} (${cfg.id})`;
+    inspectOption.textContent = cfg.name;
     inspectSelect.appendChild(inspectOption);
 
     if (colSelect) {
       const colOption = document.createElement("option");
       colOption.value = cfgId;
-      colOption.textContent = `${cfg.name} (${cfg.id})`;
+      colOption.textContent = cfg.name;
       colSelect.appendChild(colOption);
     }
   });
@@ -3628,7 +3628,7 @@ async function loadColConfigs() {
   configs.forEach((c) => {
     const opt = document.createElement("option");
     opt.value = c.id;
-    opt.textContent = `${c.name} (${c.id})`;
+    opt.textContent = c.name;
     sel.appendChild(opt);
   });
 }
