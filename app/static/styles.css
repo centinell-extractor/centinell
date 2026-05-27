@@ -1660,17 +1660,23 @@ tbody tr:hover { background: #f8f9fd; }
   border-radius: 0;
 }
 
-/* ── Responsive ──────────────────────────────────────────────── */
+/* ══════════════════════════════════════════════════════════════
+   RESPONSIVE
+   1100px  tablet landscape  — nav se vuelve barra horizontal
+    900px  tablet portrait   — layouts de 2 col se apilan
+    800px  tablet pequeño    — grids 1 col, tablas con scroll
+    640px  móvil landscape   — nav scrollable + topbar compacto
+    480px  móvil portrait    — máxima compactación
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── 1100px: tablet landscape ────────────────────────────────── */
 @media (max-width: 1100px) {
   #appShell { height: auto; overflow: visible; }
 
-  .layout {
-    flex-direction: column;
-    overflow: visible;
-  }
-
+  .layout { flex-direction: column; overflow: visible; }
   .content { overflow-y: visible; }
 
+  /* Sidebar → barra horizontal */
   .sidebar {
     width: 100%;
     flex-direction: row;
@@ -1698,26 +1704,210 @@ tbody tr:hover { background: #f8f9fd; }
     padding: 0.3rem 0.25rem;
   }
 
-  body.sidebar-collapsed .sidebar { width: 100%; }
-  body.sidebar-collapsed .sidebar-nav { flex-direction: row; padding-left: 0.25rem; padding-right: 0.25rem; }
-  body.sidebar-collapsed .sidebar-footer { padding-left: 0.25rem; padding-right: 0.25rem; }
+  /* Sidebar colapsado en tablet: resetear a barra horizontal */
+  body.sidebar-collapsed .sidebar                     { width: 100%; }
+  body.sidebar-collapsed .sidebar-nav                 { flex-direction: row; padding-left: 0.25rem; padding-right: 0.25rem; }
+  body.sidebar-collapsed .sidebar-footer              { padding-left: 0.25rem; padding-right: 0.25rem; }
   body.sidebar-collapsed .nav-btn .nav-label,
   body.sidebar-collapsed .sidebar-footer-link .nav-label { display: inline; }
-  body.sidebar-collapsed .nav-btn { justify-content: flex-start; padding: 0.52rem 0.6rem; }
-  body.sidebar-collapsed .sidebar-footer-link { justify-content: flex-start; padding: 0.46rem 0.6rem; }
+  body.sidebar-collapsed .nav-btn                     { justify-content: flex-start; padding: 0.52rem 0.6rem; }
+  body.sidebar-collapsed .sidebar-footer-link         { justify-content: flex-start; padding: 0.46rem 0.6rem; }
 
+  /* Topbar */
   .topbar { grid-template-columns: 1fr; height: auto; padding: 0.6rem 1rem; gap: 0.5rem; }
   .topbar-brand, .bu-switcher, .topbar-actions { justify-self: stretch; }
   .bu-switcher { justify-content: flex-start; border-radius: var(--r); }
   .bu-switcher select { max-width: none; flex: 1; }
 }
 
+/* ── 900px: tablet portrait ──────────────────────────────────── */
+@media (max-width: 900px) {
+  /* Assessments: de 2 cols a 1 */
+  .assess-layout { grid-template-columns: 1fr; }
+
+  /* Doc detail: columna fija → proporcional */
+  .doc-detail-layout { grid-template-columns: 1fr; }
+
+  /* Run detail: apila */
+  .run-detail-layout { grid-template-columns: 1fr; }
+
+  /* Preview en doc detail: altura razonable */
+  .doc-preview-wrap { height: 400px; min-height: 280px; }
+  .doc-detail-right .document-preview-live,
+  .run-detail-doc .document-preview-live { max-height: 400px; }
+  .run-detail-results { max-height: none; }
+}
+
+/* ── 800px: tablet pequeño / móvil landscape ─────────────────── */
 @media (max-width: 800px) {
-  .grid-2, .grid-3 { grid-template-columns: 1fr; }
-  .file-upload-controls { grid-template-columns: 1fr; }
-  .run-results-layout { grid-template-columns: 1fr; }
-  .document-preview-live { min-height: 220px; max-height: 320px; }
-  .card { padding: 1rem; }
+  /* Grids */
+  .grid-2, .grid-3        { grid-template-columns: 1fr; }
+  .file-upload-controls   { grid-template-columns: 1fr; }
+  .run-results-layout     { grid-template-columns: 1fr; }
+  .document-preview-live  { min-height: 220px; max-height: 320px; }
+  .card                   { padding: 1rem; }
+
+  /* Tablas: scroll horizontal en lugar de desbordarse */
+  .table-scroll-wrap      { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    white-space: nowrap;
+  }
+  /* Excepciones: tablas pequeñas que no necesitan scroll */
+  .run-results-main table,
+  .assess-section table {
+    display: table;
+    overflow-x: visible;
+    white-space: normal;
+  }
+  th, td { white-space: nowrap; }
+  .run-results-main th,
+  .run-results-main td,
+  .assess-section th,
+  .assess-section td { white-space: normal; }
+
+  /* Topbar: BU selector y acciones más compactos */
+  .topbar { padding: 0.5rem 0.75rem; }
+  .auth-user-box span { max-width: 120px; }
+}
+
+/* ── 640px: móvil landscape / smartphones ────────────────────── */
+@media (max-width: 640px) {
+  /* Topbar muy compacto */
+  .topbar { padding: 0.45rem 0.6rem; gap: 0.35rem; }
+  .topbar h1 { font-size: 0.88rem; }
+  .auth-user-box span { max-width: 90px; font-size: 0.72rem; }
+  .auth-user-box button { padding: 0.25rem 0.55rem; font-size: 0.72rem; }
+
+  /* Sidebar → nav scrollable horizontal tipo app */
+  .sidebar {
+    flex-wrap: nowrap;
+    border-bottom: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  /* Ocultar botón colapsar en móvil (no tiene sentido) */
+  .sidebar-header { display: none; }
+
+  /* Nav: scroll horizontal sin mostrar scrollbar */
+  .sidebar-nav {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    flex: 1;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 0.25rem 0.35rem;
+    gap: 2px;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .sidebar-nav::-webkit-scrollbar { display: none; }
+
+  /* Botones de nav: icono arriba, label pequeño abajo */
+  .nav-btn {
+    flex-direction: column;
+    align-items: center;
+    gap: 0.1rem;
+    padding: 0.4rem 0.45rem;
+    min-width: 52px;
+    max-width: 68px;
+    flex-shrink: 0;
+    min-height: 50px;
+  }
+  .nav-btn .nav-label {
+    font-size: 0.58rem;
+    text-align: center;
+    white-space: normal;
+    line-height: 1.2;
+    overflow: visible;
+    text-overflow: clip;
+  }
+  .nav-btn .nav-icon         { width: 20px; height: 20px; }
+  .nav-btn .nav-icon svg     { width: 17px; height: 17px; }
+
+  /* Ocultar footer de sidebar en móvil */
+  .sidebar-footer { display: none; }
+
+  /* Resetear sidebar colapsado en móvil */
+  body.sidebar-collapsed .sidebar     { width: 100%; }
+  body.sidebar-collapsed .sidebar-nav { flex-direction: row; flex-wrap: nowrap; }
+  body.sidebar-collapsed .nav-btn .nav-label { display: inline; }
+  body.sidebar-collapsed .nav-btn     { flex-direction: column; align-items: center; padding: 0.4rem 0.45rem; justify-content: center; }
+
+  /* Contenido: menos padding */
+  .content { padding: 0.6rem 0.5rem; }
+  .card    { padding: 0.75rem 0.65rem; border-radius: var(--r); }
+
+  /* Targets táctiles: mínimo 44 px (Apple HIG) */
+  button          { min-height: 40px; }
+  .icon-btn       { width: 40px; min-width: 40px; height: 40px; min-height: 40px; }
+  .export-btn,
+  .auth-user-box button,
+  .sidebar-toggle { min-height: 36px; }
+
+  /* Formularios: más espacio entre campos */
+  label         { gap: 0.4rem; margin-bottom: 0.8rem; }
+  input, select, textarea { padding: 0.6rem 0.7rem; font-size: 0.875rem; }
+
+  /* Upload zone: más compacta */
+  .docs-upload-inner  { padding: 18px 14px 14px; gap: 4px; }
+  .docs-upload-icon   { width: 36px; height: 36px; }
+  .docs-upload-label  { font-size: 0.82rem; }
+
+  /* Historial detalle */
+  .detail-box { min-height: 120px; font-size: 0.72rem; }
+
+  /* Col summary */
+  .col-summary { flex-direction: column; align-items: flex-start; gap: 0.6rem; }
+
+  /* Assess: layouts internos */
+  .assess-config-add-row { grid-template-columns: 1fr auto; }
+  .assess-card-actions   { flex-wrap: wrap; }
+
+  /* Users create box: sin grid-3 en móvil (ya apilado por 800px) */
+  .users-create-box { padding: 0.75rem; }
+
+  /* Confirm modal */
+  .confirm-modal-panel { padding: 1rem; }
+
+  /* Copy-to-BU: stack */
+  .copy-to-bu-row { flex-direction: column; align-items: stretch; }
+  .copy-to-bu-row select { width: 100%; }
+
+  /* API Keys: stack código de clave */
+  .apikey-copy-row { flex-direction: column; align-items: stretch; }
+  .apikey-value    { width: 100%; }
+  .apikey-copy-btn { width: 100%; }
+
+  /* Doc detail topbar */
+  .doc-detail-topbar { gap: 0.5rem; margin-bottom: 0.75rem; }
+}
+
+/* ── 480px: móvil portrait ───────────────────────────────────── */
+@media (max-width: 480px) {
+  .topbar   { padding: 0.4rem 0.5rem; }
+  .content  { padding: 0.5rem 0.4rem; }
+  .card     { padding: 0.6rem 0.5rem; }
+
+  /* Nav: iconos aún más pequeños */
+  .nav-btn          { min-width: 46px; max-width: 60px; padding: 0.35rem 0.3rem; min-height: 46px; }
+  .nav-btn .nav-icon svg { width: 15px; height: 15px; }
+  .nav-btn .nav-label    { font-size: 0.55rem; }
+
+  /* Ocultar algunas columnas secundarias en tablas muy pequeñas */
+  .docs-table th:nth-child(2),  /* Subido por */
+  .docs-table td:nth-child(2),
+  .docs-table th:nth-child(3),  /* Tamaño */
+  .docs-table td:nth-child(3)   { display: none; }
+
+  /* Historial: ocultar columnas menos críticas */
+  #historyTableBody tr td:nth-child(2),  /* ID */
+  table thead tr th:nth-child(2):has(~ th:nth-child(8)) { display: none; }
+
+  h2 { font-size: 0.95rem; }
+  h3 { font-size: 0.78rem; }
 }
 
 /* ── Copy to BU ──────────────────────────────────────────────── */
@@ -1841,9 +2031,6 @@ tbody tr:hover { background: #f8f9fd; }
   color: var(--accent);
 }
 
-@media (max-width: 768px) {
-  .doc-detail-layout, .run-detail-layout { grid-template-columns: 1fr; }
-}
 
 /* ── PDF.js viewer ───────────────────────────────────────────── */
 .doc-preview-wrap {
