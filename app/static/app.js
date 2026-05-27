@@ -272,7 +272,7 @@ function applyRoleBasedUi() {
 
   updateCopyToBuVisibility();
 
-  // ─── bu_user: sin Nueva Extracción, Evaluaciónes ni Historial ─────────────
+  // ─── bu_user: sin Nueva Extracción, Evaluaciones ni Historial ─────────────
   const canExtract = canRunExtractions();
   ["run", "assessments", "history"].forEach((viewName) => {
     const navBtn = document.querySelector(`.nav-btn[data-view="${viewName}"]`);
@@ -3709,7 +3709,7 @@ async function processCollection() {
 
   el("colProcessBtn").disabled = true;
   el("colSummary").style.display = "none";
-  setMessage("colMessage", "Creando coleccion...", "loading");
+  setMessage("colMessage", "Creando colección...", "loading");
 
   try {
     const col = await api("/collections/", {
@@ -3718,7 +3718,7 @@ async function processCollection() {
     });
     colState.collectionId = col.id;
   } catch (err) {
-    setMessage("colMessage", `Error creando coleccion: ${err.message}`, "error");
+    setMessage("colMessage", `Error creando colección: ${err.message}`, "error");
     el("colProcessBtn").disabled = false;
     return;
   }
