@@ -1894,6 +1894,35 @@ tbody tr:hover { background: #f8f9fd; }
 
   /* Doc detail topbar */
   .doc-detail-topbar { gap: 0.5rem; margin-bottom: 0.75rem; }
+
+  /* ── Tabla de documentos: layout fijo para que rellene el ancho ── */
+  /* Cancelar el display:block heredado del breakpoint 800px */
+  .docs-table {
+    display: table;
+    table-layout: fixed;
+    width: 100%;
+    white-space: normal;
+  }
+  .docs-table th,
+  .docs-table td { white-space: normal; overflow: hidden; text-overflow: ellipsis; }
+
+  /* Columnas visibles en móvil (640px): Nombre · Subido · Estado · Acciones */
+  .docs-table th:nth-child(1), .docs-table td:nth-child(1) { width: 38%; } /* Nombre */
+  .docs-table th:nth-child(4), .docs-table td:nth-child(4) { width: 22%; } /* Subido */
+  .docs-table th:nth-child(5), .docs-table td:nth-child(5) { width: 22%; } /* Estado */
+  .docs-table th:nth-child(6), .docs-table td:nth-child(6) { width: 18%; } /* Acciones */
+
+  /* ── Doc detail en móvil ─────────────────────────────────────── */
+  /* Preview primero (orden visual), formulario debajo */
+  .doc-detail-right { order: -1; }
+  .doc-detail-left  { order:  1; }
+
+  /* Preview: altura proporcional en lugar de fija */
+  .doc-preview-wrap {
+    height: 52vw;
+    min-height: 220px;
+    max-height: 55vh;
+  }
 }
 
 /* ── 480px: móvil portrait ───────────────────────────────────── */
@@ -1907,11 +1936,14 @@ tbody tr:hover { background: #f8f9fd; }
   .nav-btn .nav-icon svg { width: 15px; height: 15px; }
   .nav-btn .nav-label    { font-size: 0.55rem; }
 
-  /* Ocultar algunas columnas secundarias en tablas muy pequeñas */
-  .docs-table th:nth-child(2),  /* Subido por */
-  .docs-table td:nth-child(2),
-  .docs-table th:nth-child(3),  /* Tamaño */
-  .docs-table td:nth-child(3)   { display: none; }
+  /* Docs table en portrait: solo Nombre · Estado · Acciones */
+  .docs-table th:nth-child(2), .docs-table td:nth-child(2) { display: none; } /* Subido por */
+  .docs-table th:nth-child(3), .docs-table td:nth-child(3) { display: none; } /* Tamaño */
+  .docs-table th:nth-child(4), .docs-table td:nth-child(4) { display: none; } /* Fecha subida */
+  /* Rebalancear 3 columnas */
+  .docs-table th:nth-child(1), .docs-table td:nth-child(1) { width: 55%; }
+  .docs-table th:nth-child(5), .docs-table td:nth-child(5) { width: 25%; }
+  .docs-table th:nth-child(6), .docs-table td:nth-child(6) { width: 20%; }
 
   /* Historial: ocultar columnas menos críticas */
   #historyTableBody tr td:nth-child(2),  /* ID */
