@@ -95,7 +95,7 @@ Las empresas manejan miles de documentos no estructurados (facturas, contratos, 
 | **Professional** | 5.000 | 10.000 | 20.000.000 | 50 | **199 €** |
 | **Enterprise** | Ilimitado | Ilimitado | Ilimitado | Ilimitado | **Desde 999 €** |
 
-> **Nota sobre "tokens":** Un token es aproximadamente ¾ de una palabra. Un documento típico de 2 páginas consume entre 2.000 y 5.000 tokens por extracción. El plan Starter cubre ~400-1.000 extracciónes reales según complejidad.
+> **Nota sobre "tokens":** Un token es aproximadamente ¾ de una palabra. Un documento típico de 2 páginas consume entre 2.000 y 5.000 tokens por extracción. El plan Starter cubre ~400-1.000 extracciones reales según complejidad.
 
 #### Excedentes (overage)
 
@@ -197,7 +197,7 @@ GET /reports/admin/overview
 ```
 Te muestra para el mes en curso:
 - Cuántos documentos ha procesado cada cliente
-- Cuántas extracciónes ha hecho
+- Cuántas extracciones ha hecho
 - Cuántos tokens ha consumido (= coste directo para ti)
 - Qué plan tiene asignado
 - Cuántos usuarios activos
@@ -216,8 +216,8 @@ Muestra tendencia día a día de los últimos 30 días, comparativa mes anterior
 |-------|--------|
 | Cliente al 80%+ de su cuota | Contactarle para subir de plan (oportunidad de upsell) |
 | Cliente con 0 actividad en 2 semanas | Contactarle para ver si tiene problemas (riesgo de churn) |
-| Tokens consumidos muy altos vs extracciónes | Sus documentos son muy largos o hay un prompt mal configurado |
-| Muchas extracciónes fallidas | Problema técnico — revisar configuración de prompt |
+| Tokens consumidos muy altos vs extracciones | Sus documentos son muy largos o hay un prompt mal configurado |
+| Muchas extracciones fallidas | Problema técnico — revisar configuración de prompt |
 
 ### 5.2 Metabase (analytics visual)
 
@@ -314,7 +314,7 @@ Precios OpenAI GPT-4o (Mayo 2026):
 |-----|-------------|--------|----------------|
 | 3 free + 10 starter + 5 professional + 2 enterprise | 490 + 995 + 1.998 = **3.483 €** | ~650 € | **~2.800 €** |
 
-> A esto suma: 2-4 setups nuevos/mes = **3.000 – 12.000 € adicionales** por configuraciónes.
+> A esto suma: 2-4 setups nuevos/mes = **3.000 – 12.000 € adicionales** por configuraciones.
 
 ---
 
@@ -328,7 +328,7 @@ Precios OpenAI GPT-4o (Mayo 2026):
 
 #### 2. Análisis de documentos (1-2 días)
 - Revisar qué campos necesita extraer el cliente
-- Identificar variabilidad de formato (¿todos los documentos son iguales? ¿hay versiónes?)
+- Identificar variabilidad de formato (¿todos los documentos son iguales? ¿hay versiones?)
 - Definir plantilla de variables
 
 #### 3. Configuración técnica (1 día)

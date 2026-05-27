@@ -156,7 +156,7 @@ function canManageApiKeys() {
 }
 
 /**
- * Devuelve true si el usuario puede lanzar/ver extracciónes y evaluaciónes.
+ * Devuelve true si el usuario puede lanzar/ver extracciones y evaluaciones.
  * bu_user y bu_viewer NO pueden: solo admin_global y bu_admin tienen acceso.
  */
 function canRunExtractions() {
@@ -1252,7 +1252,7 @@ async function loadAssessments() {
     renderAssessmentList();
     populateAssessRunSelect();
   } catch (err) {
-    setMessage("assessMessage", `Error cargando evaluaciónes: ${err.message}`, "error");
+    setMessage("assessMessage", `Error cargando evaluaciones: ${err.message}`, "error");
   }
 }
 
@@ -1261,7 +1261,7 @@ function renderAssessmentList() {
   if (!container) return;
 
   if (!state.assessments.length) {
-    container.innerHTML = '<p class="empty-row">No hay evaluaciónes. Crea la primera.</p>';
+    container.innerHTML = '<p class="empty-row">No hay evaluaciones. Crea la primera.</p>';
     return;
   }
 
@@ -1288,7 +1288,7 @@ function renderAssessmentList() {
         </div>
       </div>
       ${a.description ? `<p class="assess-card-desc">${a.description}</p>` : ""}
-      <div class="assess-card-configs">${configTags || '<span style="font-size:.75rem;color:var(--text-3)">Sin configuraciónes</span>'}</div>
+      <div class="assess-card-configs">${configTags || '<span style="font-size:.75rem;color:var(--text-3)">Sin configuraciones</span>'}</div>
     `;
 
     card.querySelector(`[data-assess-run="${a.id}"]`)?.addEventListener("click", () => {
@@ -2370,7 +2370,7 @@ function parseCurrentPath() {
 
 // historyMode: "push" | "replace" | "none"
 function activateView(view, historyMode = "push", params = {}) {
-  // Guard: si el usuario no puede ejecutar extracciónes y navega a una vista
+  // Guard: si el usuario no puede ejecutar extracciones y navega a una vista
   // restringida (por URL directa o pushState), redirigir a Documentos.
   if (hasSession() && !canRunExtractions() && ["run", "assessments", "history"].includes(view)) {
     view = "documents";
@@ -2534,14 +2534,14 @@ async function loadConfigs() {
   } catch (error) {
     state.configsById = {};
     clearConfigEditor({ silent: true });
-    setMessage("configMessage", `No se pudieron cargar configuraciónes: ${error.message}`, "error");
+    setMessage("configMessage", `No se pudieron cargar configuraciones: ${error.message}`, "error");
     return;
   }
 
   if (!Array.isArray(configs)) {
     state.configsById = {};
     clearConfigEditor({ silent: true });
-    setMessage("configMessage", "Respuesta inválida al cargar configuraciónes", "error");
+    setMessage("configMessage", "Respuesta inválida al cargar configuraciones", "error");
     return;
   }
 
@@ -2564,7 +2564,7 @@ async function loadConfigs() {
     clearConfigEditor({ silent: true });
     const option = document.createElement("option");
     option.value = "";
-    option.textContent = "No hay configuraciónes";
+    option.textContent = "No hay configuraciones";
     select.appendChild(option);
     inspectSelect.appendChild(option.cloneNode(true));
     if (colSelect) colSelect.appendChild(option.cloneNode(true));
@@ -3620,7 +3620,7 @@ async function loadColConfigs() {
   if (!configs.length) {
     const opt = document.createElement("option");
     opt.value = "";
-    opt.textContent = "No hay configuraciónes";
+    opt.textContent = "No hay configuraciones";
     sel.appendChild(opt);
     return;
   }

@@ -46,7 +46,7 @@ Centinell está diseñado para servir a **múltiples clientes completamente aisl
 
 Cada cliente es una **Business Unit (BU)**:
 - Tiene su propio código único (ej. `ACME`)
-- Sus documentos, extracciónes, colecciónes y configuraciónes son **completamente privados**
+- Sus documentos, extracciones, colecciones y configuraciones son **completamente privados**
 - Ningún usuario de la BU `ACME` puede ver ni acceder a datos de la BU `BETA`
 - El aislamiento se aplica en la capa de base de datos mediante `bu_id` en todas las tablas
 
@@ -83,12 +83,12 @@ admin_global  >  bu_admin  >  bu_user  >  bu_viewer
 | Ver documentos | ✅ | ✅ | ✅ | ✅ |
 | Subir documentos | ✅ | ✅ | ✅ | ❌ |
 | Borrar documentos | ✅ | ✅ | ✅ | ❌ |
-| Ejecutar extracciónes | ✅ | ✅ | ❌ | ❌ |
-| Ver historial extracciónes | ✅ | ✅ | ❌ | ❌ |
-| Ver evaluaciónes | ✅ | ✅ | ❌ | ❌ |
-| Ver colecciónes | ✅ | ✅ | ✅ | ✅ |
-| Crear colecciónes | ✅ | ✅ | ✅ | ❌ |
-| Exportar colecciónes | ✅ | ✅ | ✅ | ❌ |
+| Ejecutar extracciones | ✅ | ✅ | ❌ | ❌ |
+| Ver historial extracciones | ✅ | ✅ | ❌ | ❌ |
+| Ver evaluaciones | ✅ | ✅ | ❌ | ❌ |
+| Ver colecciones | ✅ | ✅ | ✅ | ✅ |
+| Crear colecciones | ✅ | ✅ | ✅ | ❌ |
+| Exportar colecciones | ✅ | ✅ | ✅ | ❌ |
 | Gestiónar usuarios BU | ✅ | ✅ | ❌ | ❌ |
 | Crear/editar prompts | ✅ | ✅ | ❌ | ❌ |
 | Crear API Keys | ✅ | ✅ | ❌ | ❌ |
@@ -101,7 +101,7 @@ admin_global  >  bu_admin  >  bu_user  >  bu_viewer
 
 - **admin_global**: creado en bootstrap (`.env`), no pertenece a ninguna BU, ve todo.
 - **bu_admin**: administrador de su BU. Crea usuarios, configura prompts, ve métricas.
-- **bu_user**: usuario operativo. Sube documentos pero no puede ejecutar extracciónes directamente (acceso vía API key programática o proceso batch).
+- **bu_user**: usuario operativo. Sube documentos pero no puede ejecutar extracciones directamente (acceso vía API key programática o proceso batch).
 - **bu_viewer**: solo lectura.
 
 ---
@@ -217,7 +217,7 @@ POST /extract/  →  Crea registro pending  →  Devuelve extraction_id
 
 ### 5.4 Colecciónes (proceso en lote)
 
-Una colección agrupa múltiples extracciónes del mismo tipo (mismo PromptConfig).
+Una colección agrupa múltiples extracciones del mismo tipo (mismo PromptConfig).
 
 **Caso de uso:** procesar un lote de 500 facturas del mismo proveedor con la misma plantilla.
 
@@ -226,7 +226,7 @@ Una colección agrupa múltiples extracciónes del mismo tipo (mismo PromptConfi
 
 ### 5.5 Evaluaciónes (Assessments)
 
-Las evaluaciónes permiten ejecutar **múltiples PromptConfigs secuencialmente** sobre un mismo documento y combinar los resultados.
+Las evaluaciones permiten ejecutar **múltiples PromptConfigs secuencialmente** sobre un mismo documento y combinar los resultados.
 
 **Caso de uso:** un contrato que necesita tres extractores distintos (partes, cláusulas económicas, cláusulas de rescisión) ejecutados en orden.
 
@@ -357,7 +357,7 @@ Headers: X-BU-ID: <uuid>
 ```
 
 #### `POST /documents/from-base64` ⚠️ bu_user+
-Sube un documento en Base64 (para integraciónes API/Power Automate).
+Sube un documento en Base64 (para integraciones API/Power Automate).
 ```json
 { "filename": "factura.pdf", "content_base64": "JVBERi0xLjQ..." }
 ```
@@ -386,7 +386,7 @@ Extrae texto de un archivo sin almacenarlo. Útil para preview antes de extracci
 ```
 
 #### `GET /documents/{id}/runs`
-Lista extracciónes simples del documento.
+Lista extracciones simples del documento.
 
 #### `GET /documents/{id}/assessment-runs`
 Lista ejecuciones de evaluación del documento.
@@ -399,7 +399,7 @@ Lista ejecuciones de evaluación del documento.
 ### CONFIGURACIONES DE PROMPT
 
 #### `GET /prompt-configs/`
-Lista configuraciónes activas de la BU.
+Lista configuraciones activas de la BU.
 
 #### `POST /prompt-configs/` ⚠️ bu_admin
 Crea una nueva plantilla de extracción.
@@ -445,7 +445,7 @@ Lanza una extracción asíncrona.
 ```
 
 #### `GET /extractions/`
-Historial de extracciónes de la BU.
+Historial de extracciones de la BU.
 ```
 ?config_id=uuid&document_id=uuid&status=success|failed|validated&limit=50
 ```
@@ -482,7 +482,7 @@ Exportación masiva en CSV, XLSX o JSON.
 ### COLECCIONES
 
 #### `GET /collections/`
-Lista colecciónes de la BU con conteos de extracciónes.
+Lista colecciones de la BU con conteos de extracciones.
 ```json
 [{
   "id": "uuid", "name": "Facturas Enero", "config_id": "uuid",
@@ -500,7 +500,7 @@ Crea una nueva colección.
 Detalle de una colección con conteos.
 
 #### `GET /collections/{id}/extractions`
-Lista todas las extracciónes de la colección.
+Lista todas las extracciones de la colección.
 
 #### `GET /collections/{id}/export/xlsx`
 Descarga Excel completo de la colección.
@@ -565,7 +565,7 @@ Asigna un plan a una BU.
 ### ADMIN (gestión interna)
 
 #### `GET /admin/dashboard` ⚠️ admin_global
-Métricas globales: usuarios, BUs, extracciónes totales, fallos últimas 24h.
+Métricas globales: usuarios, BUs, extracciones totales, fallos últimas 24h.
 
 #### `GET /admin/audit-events` ⚠️ admin_global
 Log de auditoría completo con filtros.
