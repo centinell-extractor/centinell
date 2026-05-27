@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Centinell Console</title>
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v=20260520b">
-  <link rel="stylesheet" href="/static/styles.css?v=20260527e">
+  <link rel="stylesheet" href="/static/styles.css?v=20260527f">
 </head>
 <body>
   <div class="bg-shape bg-shape-a"></div>
@@ -245,6 +245,12 @@
         </div>
 
         <div class="doc-detail-layout">
+          <!-- Preview primero en el DOM → aparece arriba en móvil sin necesitar order -->
+          <div class="doc-detail-right">
+            <h3>Documento <span id="docDetailMeta" class="field-hint"></span></h3>
+            <div id="docDetailPreviewWrap" class="doc-preview-wrap"></div>
+          </div>
+
           <div class="doc-detail-left">
             <div class="doc-detail-run-form card-inner">
               <h3>Ejecutar evaluación</h3>
@@ -262,11 +268,6 @@
 
             <h3>Ejecuciones anteriores</h3>
             <div id="docDetailRunsList"><p class="empty-row">Cargando...</p></div>
-          </div>
-
-          <div class="doc-detail-right">
-            <h3>Documento <span id="docDetailMeta" class="field-hint"></span></h3>
-            <div id="docDetailPreviewWrap" class="doc-preview-wrap"></div>
           </div>
         </div>
       </section>
@@ -798,6 +799,6 @@ Content-Type: application/json
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" crossorigin="anonymous"></script>
-  <script src="/static/app.js?v=20260527e"></script>
+  <script src="/static/app.js?v=20260527f"></script>
 </body>
 </html>

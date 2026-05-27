@@ -1736,16 +1736,21 @@ tbody tr:hover { background: #f8f9fd; }
   /* Assessments: de 2 cols a 1 */
   .assess-layout { grid-template-columns: 1fr; }
 
-  /* Doc detail: columna fija → proporcional */
-  .doc-detail-layout { grid-template-columns: 1fr; }
+  /* Doc detail: apila en 1 columna — preview arriba, formulario abajo */
+  .doc-detail-layout {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "preview"
+      "form";
+  }
 
   /* Run detail: apila */
   .run-detail-layout { grid-template-columns: 1fr; }
 
-  /* Preview en doc detail: altura razonable */
-  .doc-preview-wrap { height: 400px; min-height: 280px; }
+  /* Preview: altura proporcional */
+  .doc-preview-wrap { height: 55vw; min-height: 260px; max-height: 60vh; }
   .doc-detail-right .document-preview-live,
-  .run-detail-doc .document-preview-live { max-height: 400px; }
+  .run-detail-doc .document-preview-live { max-height: 55vw; }
   .run-detail-results { max-height: none; }
 }
 
@@ -1912,16 +1917,11 @@ tbody tr:hover { background: #f8f9fd; }
   .docs-table th:nth-child(5), .docs-table td:nth-child(5) { width: 22%; } /* Estado */
   .docs-table th:nth-child(6), .docs-table td:nth-child(6) { width: 18%; } /* Acciones */
 
-  /* ── Doc detail en móvil ─────────────────────────────────────── */
-  /* Preview primero (orden visual), formulario debajo */
-  .doc-detail-right { order: -1; }
-  .doc-detail-left  { order:  1; }
-
-  /* Preview: altura proporcional en lugar de fija */
+  /* Doc preview en móvil: altura más compacta */
   .doc-preview-wrap {
-    height: 52vw;
-    min-height: 220px;
-    max-height: 55vh;
+    height: 50vw;
+    min-height: 200px;
+    max-height: 50vh;
   }
 }
 
@@ -1996,9 +1996,14 @@ tbody tr:hover { background: #f8f9fd; }
 .doc-detail-layout {
   display: grid;
   grid-template-columns: 340px 1fr;
+  grid-template-areas: "form preview";
   gap: 1.5rem;
   align-items: start;
 }
+
+/* Asignamos área a cada columna por nombre, independiente del orden en el DOM */
+.doc-detail-left  { grid-area: form; }
+.doc-detail-right { grid-area: preview; }
 
 .doc-detail-right .document-preview-live,
 .run-detail-doc .document-preview-live {
