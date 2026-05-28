@@ -977,7 +977,7 @@ function getEffectiveResponseFormat() {
   return custom.trim() || strictResponseFormat;
 }
 
-function válidateResponseFormatJson(showMessage = false) {
+function validateResponseFormatJson(showMessage = false) {
   if (state.responseFormatMode !== "custom") {
     return true;
   }
