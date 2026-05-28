@@ -290,7 +290,14 @@
             <div id="runDetailSections"></div>
           </div>
           <div class="run-detail-doc">
-            <h3>Documento</h3>
+            <div class="run-detail-doc-header">
+              <h3>Documento</h3>
+              <div class="run-export-btns">
+                <button id="runExportCsvBtn" class="secondary" type="button">CSV</button>
+                <button id="runExportJsonBtn" class="secondary" type="button">JSON</button>
+                <button id="runExportXlsxBtn" class="secondary" type="button">Excel</button>
+              </div>
+            </div>
             <div id="runDetailPreviewWrap" class="doc-preview-wrap"></div>
           </div>
         </div>
@@ -813,6 +820,7 @@ Content-Type: application/json
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" crossorigin="anonymous"></script>
-  <script src="/static/app.js?v=20260527f"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" crossorigin="anonymous"></script>
+  <script src="/static/app.js?v=20260528a"></script>
 </body>
 </html>

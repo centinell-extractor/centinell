@@ -2046,6 +2046,16 @@ tbody tr:hover { background: #f8f9fd; }
 
 .run-detail-results { overflow-y: auto; max-height: calc(100vh - 240px); }
 
+.run-detail-doc-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+.run-detail-doc-header h3 { margin: 0; }
+.run-export-btns { display: flex; gap: 0.4rem; }
+.run-export-btns button { font-size: 0.78rem; padding: 0.3rem 0.7rem; }
+
 /* Doc run cards */
 .doc-run-card {
   border: 1px solid var(--border);

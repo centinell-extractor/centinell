@@ -1952,6 +1952,69 @@ async function openRunDetail(docId, runId) {
   await loadRunDetail(docId, runId);
 }
 
+function _runDetailRows() {
+  const run = state.runDetailRun;
+  if (!run || !Array.isArray(run.combined_result)) return [];
+  const rows = [];
+  run.combined_result.forEach((section) => {
+    const configName = section.config_name || "";
+    (section.result || []).forEach((item) => {
+      rows.push({
+        Configuración: configName,
+        Campo: item.title || "",
+        Valor: item.answer ?? "",
+        Razonamiento: item.reasoning || "",
+        Cita: item.source_quote || "",
+      });
+    });
+  });
+  return rows;
+}
+
+function exportRunDetail(format) {
+  const run = state.runDetailRun;
+  if (!run) return;
+  const rows = _runDetailRows();
+  if (!rows.length) return;
+
+  const baseName = (run.document_name || run.assessment_name || "resultado").replace(/[^a-z0-9_\-]/gi, "_");
+
+  if (format === "json") {
+    const blob = new Blob([JSON.stringify(rows, null, 2)], { type: "application/json" });
+    _downloadBlob(blob, `${baseName}.json`);
+    return;
+  }
+
+  if (format === "csv") {
+    const headers = Object.keys(rows[0]);
+    const escape = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const lines = [headers.map(escape).join(","), ...rows.map((r) => headers.map((h) => escape(r[h])).join(","))];
+    const blob = new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
+    _downloadBlob(blob, `${baseName}.csv`);
+    return;
+  }
+
+  if (format === "xlsx") {
+    if (typeof XLSX === "undefined") { alert("Librería Excel no disponible, recarga la página."); return; }
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Resultados");
+    XLSX.writeFile(wb, `${baseName}.xlsx`);
+    return;
+  }
+}
+
+function _downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 async function loadRunDetail(docId, runId) {
   if (el("runDetailAssessName")) el("runDetailAssessName").textContent = "Cargando...";
   if (el("runDetailMeta")) el("runDetailMeta").textContent = "";
@@ -3954,6 +4017,9 @@ function wireActions() {
     if (doc) openDocumentDetail(doc.id);
     else activateView("documents", "push");
   });
+  on("runExportCsvBtn", "click", () => exportRunDetail("csv"));
+  on("runExportJsonBtn", "click", () => exportRunDetail("json"));
+  on("runExportXlsxBtn", "click", () => exportRunDetail("xlsx"));
   on("loadHistoryBtn", "click", loadHistory);
   on("loadAuditBtn", "click", loadAuditEvents);
   on("reloadUsersAdminBtn", "click", loadUsersAdminData);
