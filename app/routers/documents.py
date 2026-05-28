@@ -37,6 +37,9 @@ from app.config import (
 )
 from app.db.connection import AsyncSessionLocal, get_db
 from app.db.models import AssessmentRun, BusinessUnit, Document, Extraction, User
+
+# Límite de OCRs concurrentes para no agotar la memoria en la máquina de fly.io (512 MB)
+_ocr_semaphore = asyncio.Semaphore(1)
 from app.dependencies.auth import AuthContext, get_bu_auth_context, require_bu_roles_with_audit
 from app.schemas.assessment import AssessmentRunRead
 from app.schemas.document import DocumentListResponse, DocumentRead
@@ -161,69 +164,71 @@ async def _run_ocr_background(document_id: UUID, content: bytes, filename: str) 
     """
     Tarea de background: ejecuta OCR sobre el contenido del documento y
     actualiza el estado en BD. Se lanza tras el upload y no bloquea la respuesta.
+    El semáforo limita los OCR concurrentes para no agotar la RAM (512 MB en fly.io).
     """
-    async with AsyncSessionLocal() as db:
-        try:
-            document = await db.get(Document, document_id)
-            if not document:
-                return
-
-            document.status = "processing"
-            db.add(document)
-            await db.commit()
-
-            suffix = Path(filename).suffix.lower()
+    async with _ocr_semaphore:
+        async with AsyncSessionLocal() as db:
             try:
-                if suffix in {".txt", ".md", ".json", ".csv", ".xml", ".html"}:
-                    text = _decode_text_bytes(content)
-                elif suffix == ".pdf":
-                    native_pages, has_images = await asyncio.gather(
-                        asyncio.to_thread(_extract_pdf_text_native_pages, content),
-                        asyncio.to_thread(_pdf_has_embedded_images, content),
-                    )
-                    native_text = "\n\n".join(p for p in native_pages if p).strip()
-                    text = native_text
-                    should_run_ocr = OCR_FORCE_ALL_PAGES or has_images or _should_use_ocr_on_any_page(native_pages)
-                    use_vision = has_images and OCR_USE_VISION_API
-                    if OCR_FALLBACK_ENABLED and should_run_ocr:
-                        try:
-                            if use_vision:
-                                ocr_pages = await asyncio.wait_for(
-                                    _extract_pdf_pages_vision(content),
-                                    timeout=max(30, OCR_TIMEOUT_SECONDS),
-                                )
-                            else:
-                                ocr_pages = await asyncio.wait_for(
-                                    asyncio.to_thread(_extract_pdf_text_ocr_pages, content),
-                                    timeout=max(5, OCR_TIMEOUT_SECONDS),
-                                )
-                            text, _ = _combine_best_pdf_pages(native_pages, ocr_pages, prefer_ocr=has_images)
-                        except Exception as ocr_err:
-                            logger.warning("OCR background fallo para %s: %s", filename, ocr_err)
-                            text = native_text
-                elif suffix == ".docx":
-                    text = await asyncio.to_thread(_extract_docx_text, content)
-                else:
-                    raise ValueError(f"Formato no soportado: {suffix}")
-
                 document = await db.get(Document, document_id)
-                if document:
-                    document.status = "processed"
-                    document.ocr_text = text.strip() if text else ""
-                    db.add(document)
-                    await db.commit()
+                if not document:
+                    return
 
-            except Exception as exc:
-                logger.exception("OCR background fallo para documento %s", document_id)
-                document = await db.get(Document, document_id)
-                if document:
-                    document.status = "failed"
-                    document.ocr_error = str(exc)[:500]
-                    db.add(document)
-                    await db.commit()
+                document.status = "processing"
+                db.add(document)
+                await db.commit()
 
-        except Exception:
-            logger.exception("Error critico en background OCR para documento %s", document_id)
+                suffix = Path(filename).suffix.lower()
+                try:
+                    if suffix in {".txt", ".md", ".json", ".csv", ".xml", ".html"}:
+                        text = _decode_text_bytes(content)
+                    elif suffix == ".pdf":
+                        native_pages, has_images = await asyncio.gather(
+                            asyncio.to_thread(_extract_pdf_text_native_pages, content),
+                            asyncio.to_thread(_pdf_has_embedded_images, content),
+                        )
+                        native_text = "\n\n".join(p for p in native_pages if p).strip()
+                        text = native_text
+                        should_run_ocr = OCR_FORCE_ALL_PAGES or has_images or _should_use_ocr_on_any_page(native_pages)
+                        use_vision = has_images and OCR_USE_VISION_API
+                        if OCR_FALLBACK_ENABLED and should_run_ocr:
+                            try:
+                                if use_vision:
+                                    ocr_pages = await asyncio.wait_for(
+                                        _extract_pdf_pages_vision(content),
+                                        timeout=max(30, OCR_TIMEOUT_SECONDS),
+                                    )
+                                else:
+                                    ocr_pages = await asyncio.wait_for(
+                                        asyncio.to_thread(_extract_pdf_text_ocr_pages, content),
+                                        timeout=max(5, OCR_TIMEOUT_SECONDS),
+                                    )
+                                text, _ = _combine_best_pdf_pages(native_pages, ocr_pages, prefer_ocr=has_images)
+                            except Exception as ocr_err:
+                                logger.warning("OCR background fallo para %s: %s", filename, ocr_err)
+                                text = native_text
+                    elif suffix == ".docx":
+                        text = await asyncio.to_thread(_extract_docx_text, content)
+                    else:
+                        raise ValueError(f"Formato no soportado: {suffix}")
+
+                    document = await db.get(Document, document_id)
+                    if document:
+                        document.status = "processed"
+                        document.ocr_text = text.strip() if text else ""
+                        db.add(document)
+                        await db.commit()
+
+                except Exception as exc:
+                    logger.exception("OCR background fallo para documento %s", document_id)
+                    document = await db.get(Document, document_id)
+                    if document:
+                        document.status = "failed"
+                        document.ocr_error = str(exc)[:500]
+                        db.add(document)
+                        await db.commit()
+
+            except Exception:
+                logger.exception("Error critico en background OCR para documento %s", document_id)
 
 
 @router.post("/", response_model=DocumentRead, status_code=201)

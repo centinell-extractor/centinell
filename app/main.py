@@ -9,8 +9,11 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
+from sqlalchemy import update
+
 from app.bootstrap import ensure_bootstrap_admin
 from app.db.connection import AsyncSessionLocal, init_models
+from app.db.models import Document
 from app.routers import prompt_configs
 from app.routers import extract
 from app.routers import extractions
@@ -44,6 +47,19 @@ async def lifespan(app: FastAPI):
 
     async with AsyncSessionLocal() as session:
         await ensure_bootstrap_admin(session)
+
+    # Documentos que quedaron en "processing" por un crash/reinicio anterior
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            update(Document)
+            .where(Document.status == "processing")
+            .values(status="failed", ocr_error="Procesamiento interrumpido por reinicio del servidor")
+            .returning(Document.id)
+        )
+        recovered = result.fetchall()
+        if recovered:
+            await session.commit()
+            logger.warning("Recuperados %d documentos atascados en 'processing' → 'failed'", len(recovered))
 
     logger.info("Aplicación iniciada correctamente")
     yield
