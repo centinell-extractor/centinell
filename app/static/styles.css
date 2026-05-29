@@ -2043,7 +2043,7 @@ tbody tr:hover { background: #f8f9fd; }
 
 .doc-detail-layout {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 2fr 3fr;
   grid-template-areas: "form preview";
   gap: 1.5rem;
   align-items: start;
@@ -2053,14 +2053,19 @@ tbody tr:hover { background: #f8f9fd; }
 .doc-detail-left  { grid-area: form; min-width: 0; }
 .doc-detail-right { grid-area: preview; min-width: 0; }
 
-/* Ambas columnas se anclan al viewport y hacen scroll internamente */
-.doc-detail-left,
-.doc-detail-right {
+/* Columna izquierda (form + runs): scroll propio */
+.doc-detail-left {
   max-height: var(--panel-h);
   overflow-y: auto;
 }
 
-/* El preview llena su columna sin límite arbitrario */
+/* Columna derecha (preview): contiene sin scroll — el doc-preview-wrap scrollea */
+.doc-detail-right {
+  max-height: var(--panel-h);
+  overflow-y: hidden;
+}
+
+/* El preview llena la columna y scrollea internamente — sin doble barra */
 .doc-detail-right .document-preview-live,
 .run-detail-doc .document-preview-live {
   max-height: none;
@@ -2071,6 +2076,7 @@ tbody tr:hover { background: #f8f9fd; }
   width: 100%;
   height: var(--panel-h);
   min-height: 400px;
+  overflow-y: auto;
 }
 
 .doc-preview-frame {
@@ -2095,7 +2101,7 @@ tbody tr:hover { background: #f8f9fd; }
 
 .run-detail-layout {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 2fr 3fr;
   gap: 1.5rem;
   align-items: start;
 }
