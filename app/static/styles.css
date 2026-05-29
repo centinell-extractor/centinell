@@ -1779,22 +1779,24 @@ tbody tr:hover { background: #f8f9fd; }
   /* Assessments: de 2 cols a 1 */
   .assess-layout { grid-template-columns: 1fr; }
 
-  /* Doc detail: apila en 1 columna — preview arriba, formulario abajo */
+  /* Run y doc detail: apilan en tablet */
+  .run-detail-layout:not(.preview-collapsed) { grid-template-columns: 1fr; }
   .doc-detail-layout {
     grid-template-columns: 1fr;
-    grid-template-areas:
-      "preview"
-      "form";
+    grid-template-areas: "preview" "form";
   }
 
-  /* Run detail: apila en tablet (salvo que ya esté colapsado manualmente) */
-  .run-detail-layout:not(.preview-collapsed) { grid-template-columns: 1fr; }
+  /* En tablet las columnas no se anclan al viewport — scroll de página normal */
+  .doc-detail-left,
+  .doc-detail-right,
+  .run-detail-results,
+  .run-detail-doc { max-height: none; overflow-y: visible; }
 
-  /* Preview: altura proporcional */
-  .doc-preview-wrap { height: 55vw; min-height: 260px; max-height: 60vh; }
+  /* Preview con altura proporcional en tablet */
+  .doc-preview-wrap,
+  .run-detail-doc .doc-preview-wrap { height: 55vw; min-height: 260px; max-height: 60vh; }
   .doc-detail-right .document-preview-live,
   .run-detail-doc .document-preview-live { max-height: 55vw; }
-  .run-detail-results { max-height: none; }
 }
 
 /* ── 800px: tablet pequeño / móvil landscape ─────────────────── */
@@ -2036,27 +2038,38 @@ tbody tr:hover { background: #f8f9fd; }
 
 .back-btn svg { width: 16px; height: 16px; fill: currentColor; flex-shrink: 0; }
 
+/* ── Variable compartida para altura de paneles de detalle ───── */
+:root { --panel-h: calc(100vh - 220px); }
+
 .doc-detail-layout {
   display: grid;
-  grid-template-columns: 340px 1fr;
+  grid-template-columns: 1fr 1fr;
   grid-template-areas: "form preview";
   gap: 1.5rem;
   align-items: start;
 }
 
 /* Asignamos área a cada columna por nombre, independiente del orden en el DOM */
-.doc-detail-left  { grid-area: form; }
-.doc-detail-right { grid-area: preview; }
+.doc-detail-left  { grid-area: form; min-width: 0; }
+.doc-detail-right { grid-area: preview; min-width: 0; }
 
+/* Ambas columnas se anclan al viewport y hacen scroll internamente */
+.doc-detail-left,
+.doc-detail-right {
+  max-height: var(--panel-h);
+  overflow-y: auto;
+}
+
+/* El preview llena su columna sin límite arbitrario */
 .doc-detail-right .document-preview-live,
 .run-detail-doc .document-preview-live {
-  max-height: calc(100vh - 240px);
-  overflow-y: auto;
+  max-height: none;
+  overflow-y: visible;
 }
 
 .doc-preview-wrap {
   width: 100%;
-  height: calc(100vh - 240px);
+  height: var(--panel-h);
   min-height: 400px;
 }
 
@@ -2082,7 +2095,7 @@ tbody tr:hover { background: #f8f9fd; }
 
 .run-detail-layout {
   display: grid;
-  grid-template-columns: 3fr 2fr;
+  grid-template-columns: 1fr 1fr;
   gap: 1.5rem;
   align-items: start;
 }
@@ -2095,7 +2108,6 @@ tbody tr:hover { background: #f8f9fd; }
 .run-detail-layout.preview-collapsed .run-detail-doc .run-detail-doc-inner {
   display: none;
 }
-/* Botón para expandir cuando está colapsado */
 .run-detail-layout.preview-collapsed .run-detail-doc-header {
   justify-content: flex-start;
   gap: 0.5rem;
@@ -2104,7 +2116,19 @@ tbody tr:hover { background: #f8f9fd; }
   transform: rotate(180deg);
 }
 
-.run-detail-results { overflow-y: auto; max-height: calc(100vh - 240px); }
+.run-detail-results {
+  overflow-y: auto;
+  max-height: var(--panel-h);
+}
+
+.run-detail-doc {
+  max-height: var(--panel-h);
+  overflow-y: hidden;
+}
+
+.run-detail-doc .doc-preview-wrap {
+  height: calc(var(--panel-h) - 52px); /* minus doc header height */
+}
 
 .run-detail-doc-header {
   display: flex;
