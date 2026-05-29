@@ -1787,8 +1787,8 @@ tbody tr:hover { background: #f8f9fd; }
       "form";
   }
 
-  /* Run detail: apila */
-  .run-detail-layout { grid-template-columns: 1fr; }
+  /* Run detail: apila en tablet (salvo que ya esté colapsado manualmente) */
+  .run-detail-layout:not(.preview-collapsed) { grid-template-columns: 1fr; }
 
   /* Preview: altura proporcional */
   .doc-preview-wrap { height: 55vw; min-height: 260px; max-height: 60vh; }
@@ -2082,9 +2082,26 @@ tbody tr:hover { background: #f8f9fd; }
 
 .run-detail-layout {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 3fr 2fr;
   gap: 1.5rem;
   align-items: start;
+}
+.run-detail-layout > * { min-width: 0; }
+
+/* Preview colapsado: resultados ocupan todo el ancho */
+.run-detail-layout.preview-collapsed {
+  grid-template-columns: 1fr;
+}
+.run-detail-layout.preview-collapsed .run-detail-doc .run-detail-doc-inner {
+  display: none;
+}
+/* Botón para expandir cuando está colapsado */
+.run-detail-layout.preview-collapsed .run-detail-doc-header {
+  justify-content: flex-start;
+  gap: 0.5rem;
+}
+.run-detail-layout.preview-collapsed #runDetailCollapseBtn svg {
+  transform: rotate(180deg);
 }
 
 .run-detail-results { overflow-y: auto; max-height: calc(100vh - 240px); }
@@ -2095,7 +2112,12 @@ tbody tr:hover { background: #f8f9fd; }
   justify-content: space-between;
   margin-bottom: 0.75rem;
 }
-.run-detail-doc-header h3 { margin: 0; }
+.run-detail-doc-title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.run-detail-doc-title h3 { margin: 0; }
 .run-export-btns { display: flex; gap: 0.4rem; }
 .run-export-btns button { font-size: 0.78rem; padding: 0.3rem 0.7rem; }
 

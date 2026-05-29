@@ -2082,6 +2082,15 @@ async function loadRunDetail(docId, runId) {
   if (el("runDetailSections")) el("runDetailSections").innerHTML = "";
   if (el("runDetailPreviewWrap")) el("runDetailPreviewWrap").innerHTML = "";
 
+  // Restaurar estado de colapso del preview
+  const layout = document.querySelector(".run-detail-layout");
+  if (layout) {
+    const collapsed = sessionStorage.getItem("runDetailPreviewCollapsed") === "1";
+    layout.classList.toggle("preview-collapsed", collapsed);
+    const btn = el("runDetailCollapseBtn");
+    if (btn) btn.title = collapsed ? "Mostrar documento" : "Ocultar documento";
+  }
+
   try {
     const run = await api(`/assessments/runs/${runId}`);
     state.runDetailRun = run;
@@ -4122,6 +4131,14 @@ function wireActions() {
     const doc = state.docDetailDoc;
     if (doc) openDocumentDetail(doc.id);
     else activateView("documents", "push");
+  });
+  on("runDetailCollapseBtn", "click", () => {
+    const layout = document.querySelector(".run-detail-layout");
+    if (!layout) return;
+    const collapsed = layout.classList.toggle("preview-collapsed");
+    const btn = el("runDetailCollapseBtn");
+    if (btn) btn.title = collapsed ? "Mostrar documento" : "Ocultar documento";
+    sessionStorage.setItem("runDetailPreviewCollapsed", collapsed ? "1" : "0");
   });
   on("runExportCsvBtn", "click", () => exportRunDetail("csv"));
   on("runExportJsonBtn", "click", () => exportRunDetail("json"));

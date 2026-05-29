@@ -320,14 +320,21 @@
           </div>
           <div class="run-detail-doc">
             <div class="run-detail-doc-header">
-              <h3>Documento</h3>
+              <div class="run-detail-doc-title">
+                <button id="runDetailCollapseBtn" class="icon-btn secondary" type="button" title="Ocultar documento">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+                </button>
+                <h3>Documento</h3>
+              </div>
               <div class="run-export-btns">
                 <button id="runExportCsvBtn" class="secondary" type="button">CSV</button>
                 <button id="runExportJsonBtn" class="secondary" type="button">JSON</button>
                 <button id="runExportXlsxBtn" class="secondary" type="button">Excel</button>
               </div>
             </div>
-            <div id="runDetailPreviewWrap" class="doc-preview-wrap"></div>
+            <div class="run-detail-doc-inner">
+              <div id="runDetailPreviewWrap" class="doc-preview-wrap"></div>
+            </div>
           </div>
         </div>
       </section>
