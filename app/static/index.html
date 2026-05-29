@@ -4,16 +4,18 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Centinell Console</title>
-  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v=20260520b">
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v=20260529a">
   <link rel="stylesheet" href="/static/styles.css?v=20260527f">
 </head>
-<body>
+<body class="auth-loading">
   <div class="bg-shape bg-shape-a"></div>
   <div class="bg-shape bg-shape-b"></div>
 
   <section id="authGate" class="auth-gate">
     <div class="auth-panel">
       <div class="auth-brand">CENTINELL</div>
+
+      <!-- Panel: login -->
       <form id="loginForm" class="auth-form" autocomplete="on">
         <label>
           Email
@@ -25,6 +27,33 @@
         </label>
         <button id="loginBtn" type="submit">Entrar</button>
       </form>
+      <p class="auth-forgot"><button type="button" id="forgotPasswordLink">¿Olvidaste tu contraseña?</button></p>
+
+      <!-- Panel: forgot-password -->
+      <form id="forgotPasswordForm" class="auth-form" style="display:none">
+        <p class="auth-form-desc">Introduce tu email y te enviaremos un enlace para restablecer la contraseña.</p>
+        <label>
+          Email
+          <input id="forgotEmail" type="email" placeholder="admin@empresa.com" autocomplete="username">
+        </label>
+        <button id="forgotPasswordBtn" type="submit">Enviar enlace</button>
+        <button type="button" id="backToLoginBtn" class="secondary">Volver al login</button>
+      </form>
+
+      <!-- Panel: reset-password (visible cuando URL tiene ?token=...) -->
+      <form id="resetPasswordForm" class="auth-form" style="display:none">
+        <p class="auth-form-desc">Introduce tu nueva contraseña.</p>
+        <label>
+          Nueva contraseña
+          <input id="resetPasswordInput" type="password" placeholder="Mínimo 8 caracteres" autocomplete="new-password">
+        </label>
+        <label>
+          Confirmar contraseña
+          <input id="resetPasswordConfirm" type="password" placeholder="Repite la contraseña" autocomplete="new-password">
+        </label>
+        <button id="resetPasswordBtn" type="submit">Cambiar contraseña</button>
+      </form>
+
       <div id="authAlert" class="auth-alert">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2zm0 9a1 1 0 0 1 1 1v4a1 1 0 1 1-2 0v-4a1 1 0 0 1 1-1zm0-4a1.25 1.25 0 1 1 0 2.5A1.25 1.25 0 0 1 12 7z"/></svg>
         <span id="authAlertText"></span>
@@ -587,12 +616,13 @@
       </section>
 
       <section id="view-history" class="card view">
-        <h2>Historial de extracciones</h2>
+        <h2>Historial de ejecuciones</h2>
         <div class="grid-3">
           <label>
             Estado
             <select id="historyStatus">
               <option value="">todos</option>
+              <option value="processing">processing</option>
               <option value="success">success</option>
               <option value="failed">failed</option>
               <option value="validated">validated</option>
@@ -618,7 +648,7 @@
               <th>Documento</th>
               <th>ID</th>
               <th>Estado</th>
-              <th>Config</th>
+              <th>Config / Assessment</th>
               <th>Latencia</th>
               <th>Fecha</th>
               <th>Abrir doc</th>

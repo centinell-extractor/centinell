@@ -117,7 +117,7 @@ async def create_prompt_config(
             base_prompt=data.base_prompt,
             variables=variables_dicts,
             model=data.model,
-            temperature=int(data.temperature),
+            temperature=float(data.temperature),
         )
 
         db.add(prompt_config)

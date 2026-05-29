@@ -98,6 +98,10 @@ body.dark {
 
 body.dark { background: var(--canvas); color: var(--text-1); }
 
+/* Oculta ambas vistas mientras se verifica la sesión con el backend */
+body.auth-loading #authGate,
+body.auth-loading #appShell { visibility: hidden; pointer-events: none; }
+
 body.dark .auth-gate {
   background:
     radial-gradient(ellipse at 20% 0%, rgba(91, 69, 224, 0.12) 0%, transparent 55%),
@@ -197,6 +201,28 @@ body {
   text-align: center;
   font-size: 0.82rem;
   color: var(--text-3);
+}
+
+.auth-forgot {
+  margin: 0.5rem 0 0;
+  text-align: center;
+}
+.auth-forgot button {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 0.8rem;
+  color: var(--brand);
+  cursor: pointer;
+  text-decoration: underline;
+}
+.auth-forgot button:hover { background: none; color: var(--brand-hover); transform: none; }
+
+.auth-form-desc {
+  margin: 0 0 0.75rem;
+  font-size: 0.82rem;
+  color: var(--text-2);
+  line-height: 1.5;
 }
 
 .auth-alert {
@@ -836,7 +862,24 @@ tbody tr:hover { background: #f8f9fd; }
 .status-success, .status-validated { color: var(--ok);   background: var(--ok-soft);   border-color: var(--ok-border); }
 .status-failed                      { color: var(--warn); background: var(--warn-soft); border-color: var(--warn-border); }
 .status-pending, .status-running,
+.status-processing,
 .status-queued                      { color: var(--info); background: var(--info-soft); border-color: var(--info-border); }
+
+.badge-assess {
+  display: inline-block;
+  font-size: 0.6rem;
+  font-weight: 700;
+  background: var(--brand-soft);
+  color: var(--brand);
+  border: 1px solid var(--brand-border);
+  border-radius: 3px;
+  padding: 1px 4px;
+  vertical-align: middle;
+  margin-right: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  line-height: 1.4;
+}
 
 /* ── Run view ────────────────────────────────────────────────── */
 .file-upload-row { margin-bottom: 0.75rem; }

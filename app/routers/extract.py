@@ -55,6 +55,12 @@ async def _run_extraction_background(
     async with AsyncSessionLocal() as db:
         start_time = time.perf_counter()
         try:
+            # Verificación defensiva: el registro puede haberse eliminado mientras el LLM procesaba
+            extraction = await db.get(Extraction, extraction_id)
+            if not extraction:
+                logger.warning("Extracción %s ya no existe en BD; descartando resultado LLM", extraction_id)
+                return
+
             llm_result = await call_llm_for_extraction_chained(
                 document_text=document_text,
                 variables=variables,

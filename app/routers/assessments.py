@@ -197,6 +197,22 @@ async def create_assessment(
     return await _load_assessment_with_configs(db, assessment.id, auth.bu_id)
 
 
+@router.get("/runs", response_model=list[AssessmentRunRead])
+async def list_all_assessment_runs(
+    limit: int = Query(20, ge=1, le=200),
+    status: str | None = Query(None),
+    db: AsyncSession = Depends(get_db),
+    auth: AuthContext = Depends(get_bu_auth_context),
+):
+    q = select(AssessmentRun).where(AssessmentRun.bu_id == auth.bu_id)
+    if status:
+        q = q.where(AssessmentRun.status == status)
+    q = q.order_by(AssessmentRun.created_at.desc()).limit(limit)
+    result = await db.execute(q)
+    runs = list(result.scalars().all())
+    return await enrich_assessment_runs(runs, db)
+
+
 @router.get("/runs/{run_id}", response_model=AssessmentRunRead)
 async def get_assessment_run(
     run_id: UUID,

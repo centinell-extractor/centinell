@@ -872,6 +872,50 @@ async function createDefaultAdminBu() {
   }
 }
 
+function showAuthPanel(panel) {
+  ["loginForm", "forgotPasswordForm", "resetPasswordForm"].forEach((id) => {
+    const node = el(id);
+    if (node) node.style.display = id === panel ? "" : "none";
+  });
+  const forgotLink = el("forgotPasswordLink");
+  if (forgotLink) forgotLink.closest(".auth-forgot").style.display = panel === "loginForm" ? "" : "none";
+  setAuthMessage("");
+  setAuthAlert(false);
+}
+
+async function forgotPassword(event) {
+  event.preventDefault();
+  const email = el("forgotEmail").value.trim();
+  if (!email) { setAuthMessage("Introduce tu email"); return; }
+  try {
+    setAuthMessage("Enviando...");
+    await api("/auth/forgot-password", { method: "POST", body: JSON.stringify({ email }) });
+    setAuthMessage("Si el email existe, recibirás un enlace en breve.");
+  } catch (_) {
+    setAuthMessage("Error al procesar la solicitud. Inténtalo de nuevo.");
+  }
+}
+
+async function resetPassword(event) {
+  event.preventDefault();
+  const newPwd = el("resetPasswordInput").value;
+  const confirm = el("resetPasswordConfirm").value;
+  if (newPwd.length < 8) { setAuthMessage("La contraseña debe tener al menos 8 caracteres"); return; }
+  if (newPwd !== confirm) { setAuthMessage("Las contraseñas no coinciden"); return; }
+  const params = new URLSearchParams(window.location.search);
+  const token = params.get("token");
+  if (!token) { setAuthMessage("Token no encontrado en la URL"); return; }
+  try {
+    setAuthMessage("Cambiando contraseña...");
+    await api("/auth/reset-password", { method: "POST", body: JSON.stringify({ token, new_password: newPwd }) });
+    setAuthMessage("Contraseña cambiada. Ya puedes iniciar sesión.");
+    history.replaceState({}, "", "/");
+    setTimeout(() => showAuthPanel("loginForm"), 2000);
+  } catch (error) {
+    setAuthMessage(`Error: ${error.message}`);
+  }
+}
+
 async function login(event) {
   event.preventDefault();
 
@@ -1708,40 +1752,57 @@ function _drawHighlightItem(item, color) {
 function highlightPdfText(quote) {
   clearPdfHighlights();
   const items = _pdfState.textItems;
-  console.log('[highlight] textItems:', items.length, '| quote:', (quote || '').slice(0, 70));
   if (!quote || !items.length) return;
 
-  const norm = (s) => s.replace(/[\s]+/g, ' ').trim().toLowerCase();
+  const norm = (s) => s.replace(/\s+/g, ' ').trim().toLowerCase();
   const nquote = norm(quote);
-  const qwords = nquote.split(' ').filter(Boolean);
+  if (!nquote) return;
+
+  // Construir texto concatenado con posiciones para búsqueda exacta O(n)
+  let concat = '';
+  const bounds = [];
+  for (let i = 0; i < items.length; i++) {
+    const t = norm(items[i].text);
+    if (!t) continue;
+    bounds.push({ start: concat.length, end: concat.length + t.length, idx: i });
+    concat += t + ' ';
+  }
+
+  // Intento 1: subcadena exacta sobre texto concatenado (caso habitual)
+  const pos = concat.indexOf(nquote);
+  if (pos !== -1) {
+    const matchEnd = pos + nquote.length;
+    const hits = bounds.filter(b => b.start < matchEnd && b.end > pos).map(b => b.idx);
+    if (hits.length) { _applyPdfHighlights(items, hits); return; }
+  }
+
+  // Intento 2: fuzzy con ventana pequeña y umbral alto (fallback para OCR imperfecto)
+  // Se excluyen palabras cortas (artículos, preposiciones) del scoring
+  const qwords = nquote.split(' ').filter(w => w.length > 2);
   if (!qwords.length) return;
 
   let bestStart = -1, bestEnd = -1, bestScore = -1;
+  const WINDOW = 20;
 
   for (let s = 0; s < items.length; s++) {
     let combined = '';
-    for (let e = s; e < Math.min(s + 100, items.length); e++) {
+    for (let e = s; e < Math.min(s + WINDOW, items.length); e++) {
       combined += (e > s ? ' ' : '') + norm(items[e].text);
-      if (combined.includes(nquote)) {
-        bestStart = s; bestEnd = e; bestScore = 9999;
-        break;
-      }
-      const matched = qwords.filter((w) => combined.includes(w)).length;
+      const matched = qwords.filter(w => combined.includes(w)).length;
       const score = matched / qwords.length;
-      if (score > bestScore && matched >= 2) {
-        bestScore = score; bestStart = s; bestEnd = e;
-      }
+      if (score > bestScore) { bestScore = score; bestStart = s; bestEnd = e; }
     }
-    if (bestScore >= 9999) break;
   }
 
-  console.log('[highlight] bestScore:', bestScore, '| range:', bestStart, '-', bestEnd);
-  if (bestStart < 0 || bestScore < 0.3) return;
+  if (bestStart < 0 || bestScore < 0.65) return;
+  _applyPdfHighlights(items, Array.from({ length: bestEnd - bestStart + 1 }, (_, i) => bestStart + i));
+}
 
-  for (let i = bestStart; i <= bestEnd; i++) {
-    _drawHighlightItem(items[i], i === bestStart ? 'rgba(255,110,0,0.7)' : 'rgba(255,210,0,0.55)');
+function _applyPdfHighlights(items, idxList) {
+  for (let i = 0; i < idxList.length; i++) {
+    _drawHighlightItem(items[idxList[i]], i === 0 ? 'rgba(255,110,0,0.7)' : 'rgba(255,210,0,0.55)');
   }
-  items[bestStart].pageDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  items[idxList[0]].pageDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 function escapeHtml(str) {
@@ -3542,7 +3603,7 @@ function renderHistory(rows) {
 
   if (!Array.isArray(rows) || !rows.length) {
     const tr = document.createElement("tr");
-    tr.innerHTML = '<td colspan="8" class="empty-row">No hay ejecuciones con esos filtros. Ajusta filtros o lanza una nueva extracción.</td>';
+    tr.innerHTML = '<td colspan="8" class="empty-row">No hay ejecuciones con esos filtros. Ajusta filtros o lanza una nueva ejecución.</td>';
     body.appendChild(tr);
     return;
   }
@@ -3552,21 +3613,32 @@ function renderHistory(rows) {
     const docName = row.document_name && row.document_name.trim() ? row.document_name : "Sin nombre";
     const statusClass = String(row.status || "").toLowerCase();
     const createdAt = formatHistoryDate(row.created_at);
+    const isAssessment = row._type === "assessment";
+    const configLabel = isAssessment
+      ? `<span class="badge-assess">assess</span>${row.assessment_name ?? "-"}`
+      : (state.configsById?.[row.prompt_config_id]?.name ?? row.prompt_config_id ?? "-");
+    const detailAttr = isAssessment
+      ? `data-open-assess-id="${row.id}"`
+      : `data-open-id="${row.id}"`;
     tr.innerHTML = `
       <td>${docName}</td>
       <td>${row.id}</td>
       <td><span class="status-badge status-${statusClass}">${row.status}</span></td>
-      <td>${row.prompt_config_id}</td>
+      <td>${configLabel}</td>
       <td>${row.latency_ms ?? "-"} ms</td>
       <td>${createdAt}</td>
       <td>${row.document_id ? `<button type="button" data-doc-id="${row.document_id}" class="secondary icon-btn" aria-label="Abrir documento" title="Abrir documento"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5c-5.5 0-9.5 5.5-9.5 7s4 7 9.5 7 9.5-5.5 9.5-7-4-7-9.5-7zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm0-2.2a1.8 1.8 0 1 0 0-3.6 1.8 1.8 0 0 0 0 3.6z"/></svg></button>` : "-"}</td>
-      <td><button type="button" data-open-id="${row.id}" class="secondary icon-btn" aria-label="Ver detalle" title="Ver detalle"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v2H5V5zm0 6h14v2H5v-2zm0 6h10v2H5v-2z"/></svg></button></td>
+      <td><button type="button" ${detailAttr} class="secondary icon-btn" aria-label="Ver detalle" title="Ver detalle"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v2H5V5zm0 6h14v2H5v-2zm0 6h10v2H5v-2z"/></svg></button></td>
     `;
     body.appendChild(tr);
   });
 
   body.querySelectorAll("button[data-open-id]").forEach((btn) => {
     btn.addEventListener("click", () => loadExtractionDetail(btn.dataset.openId));
+  });
+
+  body.querySelectorAll("button[data-open-assess-id]").forEach((btn) => {
+    btn.addEventListener("click", () => loadAssessmentRunDetail(btn.dataset.openAssessId));
   });
 
   body.querySelectorAll("button[data-doc-id]").forEach((btn) => {
@@ -3616,16 +3688,31 @@ async function loadHistory() {
 
   const status = el("historyStatus").value;
   const configId = el("historyConfigId").value.trim();
-  const limit = el("historyLimit").value || "20";
+  const limit = Number(el("historyLimit").value || "20");
 
-  const params = new URLSearchParams();
-  if (status) params.set("status", status);
-  if (configId) params.set("config_id", configId);
-  params.set("limit", limit);
+  const extParams = new URLSearchParams();
+  if (status) extParams.set("status", status);
+  if (configId) extParams.set("config_id", configId);
+  extParams.set("limit", String(limit));
+
+  const assessParams = new URLSearchParams();
+  if (status) assessParams.set("status", status);
+  assessParams.set("limit", String(limit));
 
   try {
-    const rows = await api(`/extractions/?${params.toString()}`);
-    renderHistory(rows);
+    const [extractions, assessmentRuns] = await Promise.all([
+      api(`/extractions/?${extParams.toString()}`),
+      configId ? Promise.resolve([]) : api(`/assessments/runs?${assessParams.toString()}`),
+    ]);
+
+    const allRows = [
+      ...extractions.map((r) => ({ ...r, _type: "extraction" })),
+      ...assessmentRuns.map((r) => ({ ...r, _type: "assessment" })),
+    ]
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+      .slice(0, limit);
+
+    renderHistory(allRows);
   } catch (error) {
     el("historyDetail").textContent = `Error cargando historial: ${error.message}`;
   }
@@ -3642,6 +3729,21 @@ async function loadExtractionDetail(extractionId) {
     el("historyDetail").textContent = JSON.stringify(detail, null, 2);
   } catch (error) {
     el("historyDetail").textContent = `Error cargando detalle: ${error.message}`;
+  }
+}
+
+async function loadAssessmentRunDetail(runId) {
+  if (!hasSession() || !state.selectedBuId) {
+    el("historyDetail").textContent = "Haz login y seleccióna una BU";
+    return;
+  }
+
+  try {
+    const detail = await api(`/assessments/runs/${runId}`);
+    el("historyDetail").textContent = JSON.stringify(detail, null, 2);
+    el("historyDetail").scrollIntoView({ behavior: "smooth", block: "nearest" });
+  } catch (error) {
+    el("historyDetail").textContent = `Error cargando detalle de assessment: ${error.message}`;
   }
 }
 
@@ -3956,6 +4058,10 @@ function wireActions() {
   };
 
   on("loginForm", "submit", login);
+  on("forgotPasswordLink", "click", () => showAuthPanel("forgotPasswordForm"));
+  on("backToLoginBtn", "click", () => showAuthPanel("loginForm"));
+  on("forgotPasswordForm", "submit", forgotPassword);
+  on("resetPasswordForm", "submit", resetPassword);
   on("logoutBtn", "click", logout);
   on("sidebarToggleBtn", "click", toggleSidebar);
   on("themeToggleBtn", "click", toggleTheme);
@@ -4142,6 +4248,11 @@ async function bootstrap() {
   applySidebarState();
   wireNavigation();
   wireActions();
+
+  // Detecta flujo de reset de contraseña desde URL
+  if (new URLSearchParams(window.location.search).has("token")) {
+    showAuthPanel("resetPasswordForm");
+  }
   updateAuthUi();
   renderBuOptions();
   setResponseFormatMode("standard");
@@ -4154,21 +4265,25 @@ async function bootstrap() {
   const initialParsed = parseCurrentPath();
   activateView(initialParsed.view, "replace", initialParsed);
 
-  await checkApiStatus();
-  const buLoadState = await loadBusinessUnits();
-  if (buLoadState?.pendingAssignment) {
-    clearSessionForPendingAssignment("");
-    return;
+  try {
+    await checkApiStatus();
+    const buLoadState = await loadBusinessUnits();
+    if (buLoadState?.pendingAssignment) {
+      clearSessionForPendingAssignment("");
+      return;
+    }
+    await loadConfigs();
+    await loadColConfigs();
+    await loadHistory();
+    await loadAssessments();
+    populateAssessConfigSelect();
+    const { view: iv, docId: iDocId, runId: iRunId } = initialParsed;
+    if (iv === "documents") loadDocuments();
+    else if (iv === "doc-detail" && iDocId) loadDocumentDetail(iDocId);
+    else if (iv === "run-detail" && iDocId && iRunId) loadRunDetail(iDocId, iRunId);
+  } finally {
+    document.body.classList.remove("auth-loading");
   }
-  await loadConfigs();
-  await loadColConfigs();
-  await loadHistory();
-  await loadAssessments();
-  populateAssessConfigSelect();
-  const { view: iv, docId: iDocId, runId: iRunId } = initialParsed;
-  if (iv === "documents") loadDocuments();
-  else if (iv === "doc-detail" && iDocId) loadDocumentDetail(iDocId);
-  else if (iv === "run-detail" && iDocId && iRunId) loadRunDetail(iDocId, iRunId);
 }
 
 bootstrap();

@@ -1,8 +1,11 @@
 import hashlib
+import logging
 from pathlib import Path
 from uuid import uuid4
 
 from app.config import DOCUMENT_STORAGE_DIR
+
+logger = logging.getLogger(__name__)
 
 
 class DocumentStorageService:
@@ -25,7 +28,7 @@ class DocumentStorageService:
             if path.exists():
                 path.unlink()
         except Exception:
-            pass
+            logger.warning("Error eliminando archivo de storage: %s", storage_key, exc_info=True)
 
     def resolve(self, storage_key: str) -> Path:
         candidate = Path(storage_key)

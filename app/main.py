@@ -1,6 +1,7 @@
 # app/main.py
 import logging
 import os
+import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -8,6 +9,11 @@ from fastapi import FastAPI, Request, Response
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from pythonjsonlogger import jsonlogger
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+
+from app.rate_limit import limiter
 
 from sqlalchemy import update
 
@@ -26,12 +32,15 @@ from app.routers import assessments
 from app.routers import api_keys
 from app.routers import reports
 
-# Configurar logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+# ── Structured logging ────────────────────────────────────────────────────────
+_log_handler = logging.StreamHandler()
+_log_handler.setFormatter(
+    jsonlogger.JsonFormatter("%(asctime)s %(name)s %(levelname)s %(message)s")
 )
+logging.root.setLevel(logging.INFO)
+logging.root.handlers = [_log_handler]
 logger = logging.getLogger(__name__)
+
 
 
 @asynccontextmanager
@@ -74,6 +83,9 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 # CORS — sólo orígenes explícitos (vacío = sólo mismo origen, que es el caso normal)
 _raw_origins = os.getenv("CORS_ORIGINS", "").strip()
 _allowed_origins = [o.strip() for o in _raw_origins.split(",") if o.strip()]
@@ -88,8 +100,11 @@ if _allowed_origins:
 
 
 @app.middleware("http")
-async def security_headers(request: Request, call_next):
+async def request_id_and_security_headers(request: Request, call_next):
+    request_id = str(uuid.uuid4())
+    request.state.request_id = request_id
     response: Response = await call_next(request)
+    response.headers["X-Request-ID"] = request_id
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"

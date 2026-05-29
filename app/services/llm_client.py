@@ -83,9 +83,14 @@ async def call_llm_for_extraction(
     final_prompt = build_final_prompt(variables, base_prompt=base_prompt)
     final_prompt = (
         f"{final_prompt}\n\n"
-        "REQUISITO DE COMPATIBILIDAD: En cada item del JSON incluye tambien:\n"
-        "- 'reasoning': explicacion breve (1-2 frases) de por que elegiste ese valor; null si no aplica\n"
-        "- 'source_quote': cita LITERAL del texto (maximo 250 caracteres) en que te basaste; null si no aplica"
+        "REQUISITO DE TRAZABILIDAD: En cada item del JSON incluye tambien:\n"
+        "- 'reasoning': razonamiento detallado (3-5 frases) que explique: (1) que evidencia concreta"
+        " del documento soporta la respuesta, (2) en que seccion o contexto aparece esa informacion,"
+        " (3) como se interpreto si habia ambiguedad o multiples candidatos, y (4) por que se"
+        " descartaron otras posibles respuestas si las hubiera; null si el campo no aplica al documento.\n"
+        "- 'source_quote': cita LITERAL e IDENTICA al texto del documento (maximo 300 caracteres)"
+        " que contiene la informacion extraida; debe ser copiada exactamente como aparece en el"
+        " documento, sin parafrasis ni resumen; null si no aplica"
     )
 
     system_message = {
