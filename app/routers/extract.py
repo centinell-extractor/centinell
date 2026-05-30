@@ -17,6 +17,10 @@ from app.db.models import Document, Extraction, PromptConfig
 from app.dependencies.auth import AuthContext, get_bu_auth_context, require_bu_roles_with_audit
 from app.services.llm_client import call_llm_for_extraction_chained, LLMExtractionError
 from app.services.usage_service import EXTRACTION_RUN, TOKENS_CONSUMED, track_event
+from app.services.webhook import dispatch as webhook_dispatch
+from app.services.email import send_extraction_complete_email
+from app.services.field_validator import validate_result
+from app.db.models import User as UserModel
 from app.config import MAX_DOCUMENT_SIZE_BYTES
 
 logger = logging.getLogger(__name__)
@@ -71,10 +75,12 @@ async def _run_extraction_background(
 
             extraction = await db.get(Extraction, extraction_id)
             if extraction:
+                cleaned = llm_result["cleaned"] or []
+                annotated, has_errors = validate_result(variables, cleaned)
                 extraction.prompt_sent = llm_result["prompt_sent"]
                 extraction.raw_llm_response = llm_result["raw_llm_response"]
-                extraction.validated_result = llm_result["cleaned"]
-                extraction.status = "success"
+                extraction.validated_result = annotated
+                extraction.status = "pending_review" if has_errors else "success"
                 extraction.latency_ms = latency_ms
                 db.add(extraction)
 
@@ -109,6 +115,26 @@ async def _run_extraction_background(
 
                 await db.commit()
 
+            # Email de notificación al usuario si lo tiene activado
+            if user_id:
+                user_obj = await db.get(UserModel, user_id)
+                if user_obj and user_obj.notify_on_completion:
+                    await send_extraction_complete_email(
+                        user_obj.email,
+                        extraction.document_name or "documento",
+                        "success",
+                        str(extraction_id),
+                    )
+
+            # Webhook: extracción completada
+            await webhook_dispatch(bu_id, "extraction.completed", {
+                "extraction_id": str(extraction_id),
+                "document_id": str(extraction.document_id) if extraction and extraction.document_id else None,
+                "document_name": extraction.document_name if extraction else None,
+                "status": "success",
+                "latency_ms": latency_ms,
+            })
+
         except Exception as exc:
             latency_ms = int((time.perf_counter() - start_time) * 1000)
             logger.exception("Extracción background fallida para %s", extraction_id)
@@ -119,7 +145,6 @@ async def _run_extraction_background(
                 extraction.error_message = str(exc)[:500]
                 db.add(extraction)
 
-                # Registrar también las extracciones fallidas para métricas reales
                 await track_event(
                     db,
                     bu_id=bu_id,
@@ -134,6 +159,13 @@ async def _run_extraction_background(
                 )
 
                 await db.commit()
+
+            # Webhook: extracción fallida
+            await webhook_dispatch(bu_id, "extraction.failed", {
+                "extraction_id": str(extraction_id),
+                "document_name": extraction.document_name if extraction else None,
+                "error": str(exc)[:200],
+            })
 
 
 @router.post("/", response_model=ExtractResponse)
@@ -232,4 +264,95 @@ async def extract(
         extraction_id=extraction.id,
         config_id=payload.config_id,
         result=[],
+    )
+
+
+class BatchExtractRequest(BaseModel):
+    config_id: UUID
+    document_ids: List[UUID]
+
+
+class BatchExtractResponse(BaseModel):
+    queued: int
+    extraction_ids: List[UUID]
+    skipped: List[UUID]  # docs sin texto OCR procesado
+
+
+@router.post("/batch", response_model=BatchExtractResponse, status_code=202)
+async def batch_extract(
+    payload: BatchExtractRequest,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+    auth: AuthContext = Depends(get_bu_auth_context),
+):
+    """Encola extracciones sobre múltiples documentos con la misma configuración."""
+    await require_bu_roles_with_audit(
+        auth,
+        {"admin_global", "bu_admin", "bu_user"},
+        "No tienes permisos para ejecutar extracciones en esta BU",
+        db,
+        action="extract.batch",
+        resource_type="extraction",
+    )
+
+    config_res = await db.execute(
+        select(PromptConfig).where(
+            PromptConfig.id == payload.config_id,
+            PromptConfig.bu_id == auth.bu_id,
+            PromptConfig.is_active.is_(True),
+        )
+    )
+    config = config_res.scalars().first()
+    if not config:
+        raise HTTPException(status_code=404, detail="Configuración no encontrada")
+
+    docs_res = await db.execute(
+        select(Document).where(
+            Document.id.in_(payload.document_ids),
+            Document.bu_id == auth.bu_id,
+        )
+    )
+    docs = {d.id: d for d in docs_res.scalars().all()}
+
+    extraction_ids: List[UUID] = []
+    skipped: List[UUID] = []
+
+    for doc_id in payload.document_ids:
+        doc = docs.get(doc_id)
+        if not doc or doc.status != "processed" or not doc.ocr_text:
+            skipped.append(doc_id)
+            continue
+
+        extraction = Extraction(
+            prompt_config_id=config.id,
+            bu_id=auth.bu_id,
+            document_id=doc.id,
+            document_name=doc.filename,
+            document_hash=doc.sha256,
+            prompt_sent="",
+            status="pending",
+            retries=0,
+            model_used=config.model,
+        )
+        db.add(extraction)
+        await db.flush()
+        extraction_ids.append(extraction.id)
+
+        background_tasks.add_task(
+            _run_extraction_background,
+            extraction.id,
+            doc.ocr_text,
+            config.variables,
+            config.model,
+            config.base_prompt,
+            doc.filename,
+            auth.bu_id,
+            auth.actor_user_id,
+        )
+
+    await db.commit()
+    return BatchExtractResponse(
+        queued=len(extraction_ids),
+        extraction_ids=extraction_ids,
+        skipped=skipped,
     )

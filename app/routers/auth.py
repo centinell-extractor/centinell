@@ -14,6 +14,7 @@ from app.config import (
 from app.db.connection import get_db
 from app.db.models import BusinessUnit, PasswordResetToken, RefreshToken, User, UserBUAccess
 from app.rate_limit import limiter
+from app.dependencies.auth import get_current_user
 from app.schemas.auth import LoginRequest, LoginResponse, RefreshRequest, UserPublic
 from app.services.audit import log_audit_event
 from app.services.email import send_password_reset_email
@@ -207,6 +208,29 @@ async def logout(request: Request, response: Response):
 
 
 # ── Password reset ────────────────────────────────────────────────────────────
+
+class NotifyPreferenceRequest(BaseModel):
+    notify_on_completion: bool
+
+
+@router.get("/me/notify")
+async def get_notify_preference(
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    return {"notify_on_completion": bool(current_user.notify_on_completion)}
+
+
+@router.patch("/me/notify", status_code=204)
+async def set_notify_preference(
+    payload: NotifyPreferenceRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    current_user.notify_on_completion = payload.notify_on_completion
+    db.add(current_user)
+    await db.commit()
+
 
 class ForgotPasswordRequest(BaseModel):
     email: str

@@ -22,7 +22,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.connection import get_db
-from app.db.models import BUPlan, BusinessUnit, Plan, User
+from sqlalchemy import func, and_
+from app.db.models import BUPlan, BusinessUnit, Plan, User, UsageEvent, Extraction, AssessmentRun
 from app.dependencies.auth import (
     AuthContext,
     get_bu_auth_context,
@@ -243,3 +244,75 @@ async def assign_plan_to_bu(
         plan.code, bu.code, admin.email,
     )
     return await get_bu_usage_summary(db, bu_id)
+
+
+# ── Dashboard de la BU ────────────────────────────────────────────────────────
+
+from datetime import date, timedelta, timezone, datetime as _dt
+
+
+@router.get("/reports/dashboard", summary="Dashboard de uso de la BU")
+async def bu_dashboard(
+    db: AsyncSession = Depends(get_db),
+    auth: AuthContext = Depends(get_bu_auth_context),
+):
+    """Métricas resumidas + tendencia de 30 días para el dashboard de la BU."""
+    require_bu_roles(auth, {"bu_admin", "admin_global"}, "Solo bu_admin puede ver el dashboard")
+
+    now = _dt.now(timezone.utc)
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    # Totales del mes
+    usage_res = await db.execute(
+        select(UsageEvent.event_type, func.sum(UsageEvent.quantity).label("total"))
+        .where(UsageEvent.bu_id == auth.bu_id, UsageEvent.created_at >= month_start)
+        .group_by(UsageEvent.event_type)
+    )
+    totals = {row.event_type: int(row.total) for row in usage_res}
+
+    # Extracciones pendientes de revisión
+    review_res = await db.execute(
+        select(func.count()).where(
+            Extraction.bu_id == auth.bu_id,
+            Extraction.status == "pending_review",
+        )
+    )
+    pending_review = review_res.scalar() or 0
+
+    # Tasa de éxito extracciones (último mes)
+    ext_res = await db.execute(
+        select(Extraction.status, func.count().label("n"))
+        .where(Extraction.bu_id == auth.bu_id, Extraction.created_at >= month_start)
+        .group_by(Extraction.status)
+    )
+    ext_by_status = {row.status: row.n for row in ext_res}
+    total_ext = sum(ext_by_status.values()) or 1
+    success_rate = round((ext_by_status.get("success", 0) + ext_by_status.get("validated", 0)) / total_ext * 100, 1)
+
+    # Tendencia diaria últimos 30 días (extracciones)
+    thirty_days_ago = now - timedelta(days=30)
+    daily_res = await db.execute(
+        select(
+            func.date_trunc("day", Extraction.created_at).label("day"),
+            func.count().label("n"),
+        )
+        .where(Extraction.bu_id == auth.bu_id, Extraction.created_at >= thirty_days_ago)
+        .group_by("day")
+        .order_by("day")
+    )
+    daily = [{"date": str(row.day.date()), "extractions": row.n} for row in daily_res]
+
+    # Coste estimado (tokens × precio aproximado gpt-4o)
+    tokens_this_month = totals.get("tokens.consumed", 0)
+    estimated_cost_eur = round(tokens_this_month / 1_000_000 * 5.0, 4)  # ~5€/M tokens
+
+    return {
+        "month": month_start.strftime("%B %Y"),
+        "extractions_this_month": totals.get("extraction.run", 0),
+        "documents_this_month": totals.get("doc.uploaded", 0),
+        "tokens_this_month": tokens_this_month,
+        "estimated_cost_eur": estimated_cost_eur,
+        "success_rate_pct": success_rate,
+        "pending_review": pending_review,
+        "daily_trend": daily,
+    }

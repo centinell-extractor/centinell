@@ -309,3 +309,51 @@ async def export_extractions_bulk(
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": 'attachment; filename="extracciones.xlsx"'},
     )
+
+
+
+# ── Review queue ──────────────────────────────────────────────────────────────
+
+@router.patch("/{extraction_id}/flag-review", status_code=204)
+async def flag_for_review(
+    extraction_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    auth: AuthContext = Depends(get_bu_auth_context),
+):
+    """Marca una extracción como pendiente de revisión humana."""
+    extraction = await db.get(Extraction, extraction_id)
+    if not extraction or extraction.bu_id != auth.bu_id:
+        raise HTTPException(status_code=404, detail="Extracción no encontrada")
+    extraction.status = "pending_review"
+    db.add(extraction)
+    await db.commit()
+
+
+@router.patch("/{extraction_id}/approve", status_code=204)
+async def approve_extraction(
+    extraction_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    auth: AuthContext = Depends(get_bu_auth_context),
+):
+    """Aprueba una extracción en revisión (→ validated)."""
+    extraction = await db.get(Extraction, extraction_id)
+    if not extraction or extraction.bu_id != auth.bu_id:
+        raise HTTPException(status_code=404, detail="Extracción no encontrada")
+    extraction.status = "validated"
+    db.add(extraction)
+    await db.commit()
+
+
+@router.patch("/{extraction_id}/reject", status_code=204)
+async def reject_extraction(
+    extraction_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    auth: AuthContext = Depends(get_bu_auth_context),
+):
+    """Rechaza una extracción en revisión (→ failed)."""
+    extraction = await db.get(Extraction, extraction_id)
+    if not extraction or extraction.bu_id != auth.bu_id:
+        raise HTTPException(status_code=404, detail="Extracción no encontrada")
+    extraction.status = "failed"
+    db.add(extraction)
+    await db.commit()

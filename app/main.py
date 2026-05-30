@@ -31,6 +31,7 @@ from app.routers import admin
 from app.routers import assessments
 from app.routers import api_keys
 from app.routers import reports
+from app.routers import webhooks
 
 # ── Structured logging ────────────────────────────────────────────────────────
 _log_handler = logging.StreamHandler()
@@ -129,6 +130,7 @@ app.include_router(admin.router)
 app.include_router(assessments.router)
 app.include_router(api_keys.router)
 app.include_router(reports.router)
+app.include_router(webhooks.router)
 
 
 @app.get("/")

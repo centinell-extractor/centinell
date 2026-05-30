@@ -2363,3 +2363,60 @@ tbody tr:hover { background: #f8f9fd; }
   font-size: 0.82rem;
   line-height: 1.6;
 }
+
+/* ══════════════ DASHBOARD ═══════════════════════════════════════════ */
+.dashboard-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.stat-card {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 1rem 1.2rem;
+  text-align: center;
+}
+.stat-card--alert { border-color: var(--warn-border); background: var(--warn-soft); }
+.stat-value { font-size: 1.8rem; font-weight: 700; color: var(--brand); line-height: 1.1; }
+.stat-card--alert .stat-value { color: var(--warn); }
+.stat-label { font-size: 0.75rem; color: var(--text-3); margin-top: 0.3rem; }
+.dash-chart-wrap { position: relative; width: 100%; }
+.dash-chart-wrap canvas { width: 100% !important; }
+
+/* ══════════════ WEBHOOKS ════════════════════════════════════════════ */
+.webhook-events-check {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.2rem;
+  margin-top: 0.4rem;
+}
+.webhook-events-check label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.83rem;
+  font-weight: 400;
+  cursor: pointer;
+}
+
+/* ══════════════ NOTIFICACIONES ══════════════════════════════════════ */
+.notify-pref-box {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+  padding: 0.9rem 1rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+}
+.toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-weight: 400;
+}

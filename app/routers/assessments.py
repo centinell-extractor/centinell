@@ -23,6 +23,9 @@ from app.schemas.assessment import (
 )
 from app.services.llm_client import call_llm_for_extraction_chained
 from app.services.run_enricher import enrich_assessment_runs
+from app.services.webhook import dispatch as webhook_dispatch
+from app.services.email import send_assessment_complete_email
+from app.db.models import User as UserModel
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/assessments", tags=["assessments"])
@@ -111,6 +114,26 @@ async def _run_assessment_background(
                 db.add(run)
                 await db.commit()
 
+                if run.created_by:
+                    user_obj = await db.get(UserModel, run.created_by)
+                    if user_obj and user_obj.notify_on_completion:
+                        await send_assessment_complete_email(
+                            user_obj.email,
+                            run.assessment_name or "assessment",
+                            run.document_name or "documento",
+                            "success",
+                            str(run.id),
+                        )
+
+                await webhook_dispatch(run.bu_id, "assessment.completed", {
+                    "run_id": str(run.id),
+                    "assessment_id": str(run.assessment_id) if run.assessment_id else None,
+                    "assessment_name": run.assessment_name,
+                    "document_name": run.document_name,
+                    "status": "success",
+                    "latency_ms": run.latency_ms,
+                })
+
         except Exception as exc:
             logger.exception("Assessment run fallido %s", run_id)
             run = await db.get(AssessmentRun, run_id)
@@ -120,6 +143,13 @@ async def _run_assessment_background(
                 run.latency_ms = int((time.perf_counter() - start) * 1000)
                 db.add(run)
                 await db.commit()
+
+                await webhook_dispatch(run.bu_id, "assessment.failed", {
+                    "run_id": str(run.id),
+                    "assessment_name": run.assessment_name,
+                    "document_name": run.document_name,
+                    "error": str(exc)[:200],
+                })
 
 
 @router.get("/", response_model=list[AssessmentRead])

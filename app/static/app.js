@@ -528,6 +528,185 @@ async function createUserInCurrentBu() {
 
 // ══════════════ API KEYS ══════════════
 
+// ══════════════════════════════ DASHBOARD ══════════════════════════════════
+
+async function loadDashboard() {
+  if (!hasSession() || !state.selectedBuId) return;
+  try {
+    const data = await api("/reports/dashboard");
+    el("dashExtractions").textContent = data.extractions_this_month ?? "—";
+    el("dashDocuments").textContent = data.documents_this_month ?? "—";
+    el("dashTokens").textContent = (data.tokens_this_month ?? 0).toLocaleString();
+    el("dashCost").textContent = `${(data.estimated_cost_eur ?? 0).toFixed(4)} €`;
+    el("dashSuccessRate").textContent = `${data.success_rate_pct ?? 0}%`;
+    el("dashPendingReview").textContent = data.pending_review ?? 0;
+    renderDashChart(data.daily_trend || []);
+  } catch (e) {
+    el("dashExtractions").textContent = "Error";
+  }
+}
+
+function renderDashChart(daily) {
+  const canvas = el("dashChartCanvas");
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  const W = canvas.parentElement.clientWidth || 600;
+  canvas.width = W; canvas.height = 120;
+  if (!daily.length) { ctx.fillStyle = "var(--text-3)"; ctx.fillText("Sin datos", 10, 60); return; }
+  const maxVal = Math.max(...daily.map(d => d.extractions), 1);
+  const pad = { l: 28, r: 10, t: 10, b: 28 };
+  const chartW = W - pad.l - pad.r;
+  const chartH = 120 - pad.t - pad.b;
+  const barW = Math.max(2, chartW / daily.length - 2);
+  ctx.clearRect(0, 0, W, 120);
+  // Grid lines
+  ctx.strokeStyle = getComputedStyle(document.body).getPropertyValue("--border") || "#e2e6f0";
+  ctx.lineWidth = 1;
+  [0, 0.5, 1].forEach(f => {
+    const y = pad.t + chartH * (1 - f);
+    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(W - pad.r, y); ctx.stroke();
+  });
+  // Bars
+  ctx.fillStyle = "#7c3aed";
+  daily.forEach((d, i) => {
+    const x = pad.l + i * (chartW / daily.length);
+    const h = (d.extractions / maxVal) * chartH;
+    ctx.fillRect(x, pad.t + chartH - h, barW, h);
+  });
+  // X labels (first and last)
+  ctx.fillStyle = getComputedStyle(document.body).getPropertyValue("--text-3") || "#7080a0";
+  ctx.font = "10px sans-serif";
+  if (daily.length) {
+    ctx.fillText(daily[0].date.slice(5), pad.l, 120 - 8);
+    ctx.textAlign = "right";
+    ctx.fillText(daily[daily.length - 1].date.slice(5), W - pad.r, 120 - 8);
+    ctx.textAlign = "left";
+  }
+}
+
+// ══════════════════════════════ WEBHOOKS ════════════════════════════════════
+
+async function loadWebhooks() {
+  if (!hasSession() || !state.selectedBuId) return;
+  try {
+    const rows = await api("/webhooks/");
+    const body = el("webhooksTableBody");
+    if (!rows.length) {
+      body.innerHTML = '<tr><td colspan="6" class="empty-row">No hay webhooks configurados.</td></tr>';
+      return;
+    }
+    body.innerHTML = rows.map(w => `
+      <tr>
+        <td>${escapeHtml(w.name)}</td>
+        <td class="mono" style="font-size:0.75rem;word-break:break-all">${escapeHtml(w.url.slice(0, 50))}…</td>
+        <td>${(w.events || []).join(", ")}</td>
+        <td>${w.last_triggered_at ? formatHistoryDate(w.last_triggered_at) : "—"}</td>
+        <td><span class="status-badge status-${w.is_active ? "success" : "failed"}">${w.is_active ? "activo" : "inactivo"}</span></td>
+        <td>
+          <button class="secondary icon-btn" data-wh-toggle="${w.id}" title="${w.is_active ? "Desactivar" : "Activar"}">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 7H7v10h10V7zm-8 8V9h6v6H9z"/></svg>
+          </button>
+          <button class="secondary icon-btn" data-wh-test="${w.id}" title="Test">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 16.5l6-4.5-6-4.5v9zM12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2z"/></svg>
+          </button>
+          <button class="secondary icon-btn danger" data-wh-del="${w.id}" title="Eliminar">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 9v10H8V9h8m-1.5-6h-5l-1 1H5v2h14V4h-3.5l-1-1z"/></svg>
+          </button>
+        </td>
+      </tr>`).join("");
+    body.querySelectorAll("[data-wh-toggle]").forEach(btn =>
+      btn.addEventListener("click", () => toggleWebhook(btn.dataset.whToggle)));
+    body.querySelectorAll("[data-wh-test]").forEach(btn =>
+      btn.addEventListener("click", () => testWebhook(btn.dataset.whTest)));
+    body.querySelectorAll("[data-wh-del]").forEach(btn =>
+      btn.addEventListener("click", () => deleteWebhook(btn.dataset.whDel)));
+  } catch (e) { console.error(e); }
+}
+
+async function createWebhook() {
+  const name = el("webhookName").value.trim();
+  const url = el("webhookUrl").value.trim();
+  const events = [...document.querySelectorAll("input[name='whEvent']:checked")].map(c => c.value);
+  if (!name || !url || !events.length) { setMessage("webhookMessage", "Completa nombre, URL y al menos un evento", "error"); return; }
+  try {
+    setMessage("webhookMessage", "Creando…", "idle");
+    await api("/webhooks/", { method: "POST", body: JSON.stringify({ name, url, events }) });
+    el("webhookName").value = ""; el("webhookUrl").value = "";
+    setMessage("webhookMessage", "Webhook creado. El secret aparece solo en la API (campo secret_prefix).", "ok");
+    await loadWebhooks();
+  } catch (e) { setMessage("webhookMessage", `Error: ${e.message}`, "error"); }
+}
+
+async function toggleWebhook(id) {
+  await api(`/webhooks/${id}/toggle`, { method: "PATCH" });
+  await loadWebhooks();
+}
+
+async function testWebhook(id) {
+  await api(`/webhooks/${id}/test`, { method: "POST" });
+  setMessage("webhookMessage", "Evento de prueba enviado", "ok");
+}
+
+async function deleteWebhook(id) {
+  if (!confirm("¿Eliminar este webhook?")) return;
+  await api(`/webhooks/${id}`, { method: "DELETE" });
+  await loadWebhooks();
+}
+
+// ══════════════════════════════ REVIEW QUEUE ═════════════════════════════════
+
+async function loadReviewQueue() {
+  if (!hasSession() || !state.selectedBuId) return;
+  try {
+    const rows = await api("/extractions/?status=pending_review&limit=50");
+    const body = el("reviewTableBody");
+    if (!rows.length) {
+      body.innerHTML = '<tr><td colspan="5" class="empty-row">No hay extracciones pendientes de revisión.</td></tr>';
+      return;
+    }
+    body.innerHTML = rows.map(r => {
+      const errors = (r.validated_result || []).filter(f => f.validation_error).map(f => `${f.title}: ${f.validation_error}`).join("; ");
+      return `<tr>
+        <td>${escapeHtml(r.document_name || "—")}</td>
+        <td>${r.prompt_config_id}</td>
+        <td>${formatHistoryDate(r.created_at)}</td>
+        <td style="color:var(--warn);font-size:0.78rem">${escapeHtml(errors || "Marcada manualmente")}</td>
+        <td>
+          <button class="secondary" data-approve="${r.id}">Aprobar</button>
+          <button class="secondary danger" data-reject="${r.id}">Rechazar</button>
+        </td>
+      </tr>`;
+    }).join("");
+    body.querySelectorAll("[data-approve]").forEach(btn =>
+      btn.addEventListener("click", async () => {
+        await api(`/extractions/${btn.dataset.approve}/approve`, { method: "PATCH" });
+        await loadReviewQueue();
+      }));
+    body.querySelectorAll("[data-reject]").forEach(btn =>
+      btn.addEventListener("click", async () => {
+        await api(`/extractions/${btn.dataset.reject}/reject`, { method: "PATCH" });
+        await loadReviewQueue();
+      }));
+  } catch (e) { console.error(e); }
+}
+
+// ══════════════════════ NOTIFICACIONES ═══════════════════════════════════════
+
+async function loadNotifyPreference() {
+  if (!state.currentUser) return;
+  try {
+    const pref = await api("/auth/me/notify");
+    const toggle = el("notifyOnCompletionToggle");
+    if (toggle) toggle.checked = !!pref.notify_on_completion;
+  } catch (_) {}
+}
+
+async function saveNotifyPreference(value) {
+  try {
+    await api("/auth/me/notify", { method: "PATCH", body: JSON.stringify({ notify_on_completion: value }) });
+  } catch (e) { console.error("Error guardando preferencia:", e); }
+}
+
 async function loadApiKeys() {
   if (!canManageApiKeys()) return;
   if (!state.selectedBuId) {
@@ -2251,6 +2430,41 @@ function docStatusBadge(status) {
   return badges[status] || badges.pending;
 }
 
+// ── Batch mode ────────────────────────────────────────────────────────────────
+let _batchMode = false;
+
+function toggleBatchMode() {
+  _batchMode = !_batchMode;
+  el("docsCheckHeader").style.display = _batchMode ? "" : "none";
+  el("batchBar").style.display = _batchMode ? "" : "none";
+  if (!_batchMode) el("docsSelectAll").checked = false;
+  // Populate config select
+  if (_batchMode) {
+    const sel = el("batchConfigSelect");
+    sel.innerHTML = '<option value="">Selecciona config…</option>' +
+      Object.values(state.configsById || {}).map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join("");
+  }
+  renderDocumentsList();
+}
+
+function updateBatchCount() {
+  const checked = [...document.querySelectorAll(".doc-batch-check:checked")];
+  el("batchCount").textContent = `${checked.length} seleccionado${checked.length !== 1 ? "s" : ""}`;
+}
+
+async function runBatch() {
+  const configId = el("batchConfigSelect").value;
+  if (!configId) { setMessage("docsMessage", "Selecciona una configuración", "error"); return; }
+  const ids = [...document.querySelectorAll(".doc-batch-check:checked")].map(c => c.dataset.docId);
+  if (!ids.length) { setMessage("docsMessage", "Selecciona al menos un documento", "error"); return; }
+  try {
+    setMessage("docsMessage", "Encolando extracciones…", "idle");
+    const res = await api("/extract/batch", { method: "POST", body: JSON.stringify({ config_id: configId, document_ids: ids }) });
+    setMessage("docsMessage", `Encoladas ${res.queued} extracción(es). Omitidas: ${res.skipped.length}`, "ok");
+    toggleBatchMode();
+  } catch (e) { setMessage("docsMessage", `Error: ${e.message}`, "error"); }
+}
+
 function renderDocumentsList() {
   const body = el("docsTableBody");
   const countEl = el("docsCount");
@@ -2258,7 +2472,7 @@ function renderDocumentsList() {
   if (!body) return;
 
   const showActions = canRunExtractions();
-  const colSpan = showActions ? 6 : 5;
+  const colSpan = (showActions ? 6 : 5) + (_batchMode ? 1 : 0);
 
   if (!state.docsItems.length) {
     body.innerHTML = `<tr><td colspan="${colSpan}" class="empty-row">No hay documentos en esta BU. Sube el primero.</td></tr>`;
@@ -2284,6 +2498,7 @@ function renderDocumentsList() {
     const relDate = doc.created_at ? formatRelativeTime(doc.created_at) : "-";
 
     tr.innerHTML = `
+      ${_batchMode ? `<td style="width:36px;text-align:center"><input type="checkbox" class="doc-batch-check" data-doc-id="${doc.id}" ${doc.status !== "processed" ? "disabled" : ""}></td>` : ""}
       <td>
         <div class="docs-filename-cell docs-filename-clickable" data-doc-detail="${doc.id}" title="Ver detalle del documento">
           ${docFileIcon(doc.mime_type)}
@@ -2310,6 +2525,16 @@ function renderDocumentsList() {
   body.querySelectorAll("[data-doc-detail]").forEach((cell) => {
     cell.addEventListener("click", () => openDocumentDetail(cell.dataset.docDetail));
   });
+
+  if (_batchMode) {
+    body.querySelectorAll(".doc-batch-check").forEach(chk =>
+      chk.addEventListener("change", updateBatchCount));
+    const selAll = el("docsSelectAll");
+    if (selAll) selAll.onchange = (e) => {
+      body.querySelectorAll(".doc-batch-check:not(:disabled)").forEach(c => c.checked = e.target.checked);
+      updateBatchCount();
+    };
+  }
 
   if (showActions) {
     body.querySelectorAll("button[data-doc-open]").forEach((btn) => {
@@ -4050,7 +4275,10 @@ function wireNavigation() {
     const { view, docId, runId } = parsed;
     activateView(view, "none", parsed);
     if (view === "apikeys" && canManageApiKeys()) loadApiKeys();
-    if (view === "users" && canManageUsers()) loadUsersAdminData();
+    if (view === "webhooks") loadWebhooks();
+    if (view === "dashboard") loadDashboard();
+    if (view === "review") loadReviewQueue();
+    if (view === "users") { if (canManageUsers()) loadUsersAdminData(); loadNotifyPreference(); }
     if (view === "documents") loadDocuments();
     if (view === "assessments") { loadAssessments(); populateAssessConfigSelect(); populateAssessDocSelect(); }
     if (view === "doc-detail" && docId) loadDocumentDetail(docId);
@@ -4148,6 +4376,13 @@ function wireActions() {
   on("reloadUsersAdminBtn", "click", loadUsersAdminData);
   on("createUserInBuBtn", "click", createUserInCurrentBu);
   on("reloadApiKeysBtn", "click", loadApiKeys);
+  on("docsSelectModeBtn", "click", toggleBatchMode);
+  on("batchRunBtn", "click", runBatch);
+  on("batchCancelBtn", "click", toggleBatchMode);
+  on("createWebhookBtn", "click", createWebhook);
+  on("reloadWebhooksBtn", "click", loadWebhooks);
+  on("reloadReviewBtn", "click", loadReviewQueue);
+  on("notifyOnCompletionToggle", "change", (e) => saveNotifyPreference(e.target.checked));
   on("createApiKeyBtn", "click", createApiKey);
   on("apikeyNewKeyCopyBtn", "click", copyApiKeyToClipboard);
   on("confirmModalCancelBtn", "click", () => closeConfirmModal(false));

@@ -51,6 +51,36 @@ async def send_email(to: str, subject: str, body_html: str, body_text: str) -> N
         logger.exception("Error enviando email a %s | %s", to, subject)
 
 
+async def send_extraction_complete_email(to: str, document_name: str, status: str, extraction_id: str) -> None:
+    icon = "✅" if status == "success" else "❌"
+    label = "completada correctamente" if status == "success" else "fallida"
+    subject = f"{icon} Extracción {label} — {document_name}"
+    url = f"{APP_BASE_URL}/history"
+    body_text = f"La extracción del documento '{document_name}' ha {label}.\nVer en: {url}"
+    body_html = f"""<!DOCTYPE html><html lang="es"><body style="font-family:sans-serif;color:#1a1a2e;max-width:480px;margin:0 auto;padding:24px">
+  <h2 style="color:#7c3aed">Centinell</h2>
+  <p>{icon} La extracción de <strong>{document_name}</strong> ha {label}.</p>
+  <p><a href="{url}" style="display:inline-block;background:#7c3aed;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600">Ver historial</a></p>
+  <p style="color:#999;font-size:0.75em">ID: {extraction_id}</p>
+</body></html>"""
+    await send_email(to, subject, body_html, body_text)
+
+
+async def send_assessment_complete_email(to: str, assessment_name: str, document_name: str, status: str, run_id: str) -> None:
+    icon = "✅" if status == "success" else "❌"
+    label = "completado" if status == "success" else "fallido"
+    subject = f"{icon} Assessment {label} — {assessment_name}"
+    url = f"{APP_BASE_URL}/history"
+    body_text = f"El assessment '{assessment_name}' sobre '{document_name}' ha {label}.\nVer en: {url}"
+    body_html = f"""<!DOCTYPE html><html lang="es"><body style="font-family:sans-serif;color:#1a1a2e;max-width:480px;margin:0 auto;padding:24px">
+  <h2 style="color:#7c3aed">Centinell</h2>
+  <p>{icon} El assessment <strong>{assessment_name}</strong> sobre <strong>{document_name}</strong> ha {label}.</p>
+  <p><a href="{url}" style="display:inline-block;background:#7c3aed;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600">Ver historial</a></p>
+  <p style="color:#999;font-size:0.75em">Run ID: {run_id}</p>
+</body></html>"""
+    await send_email(to, subject, body_html, body_text)
+
+
 async def send_password_reset_email(to: str, token: str) -> None:
     reset_url = f"{APP_BASE_URL}/reset-password?token={token}"
     subject = "Recuperación de contraseña — Centinell"

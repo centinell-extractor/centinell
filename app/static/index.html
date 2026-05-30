@@ -135,6 +135,18 @@
           <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12.65 10A5.99 5.99 0 0 0 7 6a6 6 0 1 0 5.65 8H17v2h2v-2h2v-2h-8.35zM7 14c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4z"/></svg></span>
           <span class="nav-label">API Keys</span>
         </button>
+        <button class="nav-btn" data-view="webhooks" title="Webhooks">
+          <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M13.5 3a10.5 10.5 0 1 0 7.4 17.9l-1.4-1.4A8.5 8.5 0 1 1 13.5 5V3zm7 5V3h-5l1.9 1.9-4.4 4.4 1.4 1.4 4.4-4.4L20.5 8z"/></svg></span>
+          <span class="nav-label">Webhooks</span>
+        </button>
+        <button class="nav-btn" data-view="dashboard" title="Dashboard">
+          <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></svg></span>
+          <span class="nav-label">Dashboard</span>
+        </button>
+        <button class="nav-btn" data-view="review" title="Revisión">
+          <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg></span>
+          <span class="nav-label">Revisión</span>
+        </button>
       </div>
 
       <div class="sidebar-footer">
@@ -232,9 +244,22 @@
 
         <div class="docs-list-header">
           <span id="docsCount" class="docs-count"></span>
-          <button id="docsRefreshBtn" class="icon-btn secondary" type="button" title="Recargar">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
-          </button>
+          <div style="display:flex;gap:0.5rem;align-items:center">
+            <div id="batchBar" class="batch-bar" style="display:none">
+              <span id="batchCount">0 seleccionados</span>
+              <select id="batchConfigSelect" style="font-size:0.8rem;padding:0.25rem 0.5rem">
+                <option value="">Config…</option>
+              </select>
+              <button id="batchRunBtn" class="secondary" type="button" style="font-size:0.8rem;padding:0.3rem 0.8rem">Ejecutar en lote</button>
+              <button id="batchCancelBtn" class="secondary" type="button" style="font-size:0.8rem;padding:0.3rem 0.6rem">✕</button>
+            </div>
+            <button id="docsSelectModeBtn" class="icon-btn secondary" type="button" title="Selección múltiple para lote">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h2V3H3v2zm0 8h2v-2H3v2zm0 8h2v-2H3v2zm4-16v2h14V5H7zm0 10h14v-2H7v2zm0 8h14v-2H7v2z"/></svg>
+            </button>
+            <button id="docsRefreshBtn" class="icon-btn secondary" type="button" title="Recargar">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+            </button>
+          </div>
         </div>
 
         <div id="docsMessage" class="message" role="status" aria-live="polite"></div>
@@ -242,6 +267,7 @@
         <table class="docs-table">
           <thead>
             <tr>
+              <th id="docsCheckHeader" style="display:none;width:36px"><input type="checkbox" id="docsSelectAll" title="Seleccionar todos"></th>
               <th>Nombre</th>
               <th>Subido por</th>
               <th>Tamaño</th>
@@ -725,6 +751,14 @@
       <section id="view-users" class="card view">
         <h2>Usuarios</h2>
         <p class="section-lead">Asigna o remueve accesos por BU y cambia el rol BU de usuarios existentes.</p>
+
+        <div class="card-inner notify-pref-box">
+          <strong>Mis notificaciones</strong>
+          <label class="toggle-label">
+            <input type="checkbox" id="notifyOnCompletionToggle">
+            <span>Recibir email cuando una extracción o assessment termine</span>
+          </label>
+        </div>
         <div class="users-create-box">
           <h3>Crear usuario en BU actual</h3>
           <div class="grid-3 users-create-grid">
@@ -839,6 +873,67 @@ Content-Type: application/json
 }</pre>
         </div>
       </section>
+
+      <!-- ══════════════ WEBHOOKS ══════════════ -->
+      <section id="view-webhooks" class="card view">
+        <h2>Webhooks</h2>
+        <p class="section-lead">Recibe notificaciones HTTP en tiempo real cuando una extracción o assessment se completa. El payload viene firmado con HMAC-SHA256 en la cabecera <code>X-Centinell-Signature</code>.</p>
+
+        <div class="apikeys-create-box">
+          <h3>Nuevo webhook</h3>
+          <div class="grid-2">
+            <label>Nombre <input id="webhookName" type="text" placeholder="Power Automate — Facturas"></label>
+            <label>URL <input id="webhookUrl" type="url" placeholder="https://prod-xx.logic.azure.com/..."></label>
+          </div>
+          <label>Eventos
+            <div class="webhook-events-check">
+              <label><input type="checkbox" name="whEvent" value="extraction.completed" checked> extraction.completed</label>
+              <label><input type="checkbox" name="whEvent" value="extraction.failed"> extraction.failed</label>
+              <label><input type="checkbox" name="whEvent" value="assessment.completed" checked> assessment.completed</label>
+              <label><input type="checkbox" name="whEvent" value="assessment.failed"> assessment.failed</label>
+            </div>
+          </label>
+          <div class="actions"><button id="createWebhookBtn" type="button">Crear webhook</button></div>
+          <div id="webhookMessage" class="message" role="status" aria-live="polite"></div>
+        </div>
+
+        <div class="actions"><button id="reloadWebhooksBtn" class="secondary" type="button">Recargar lista</button></div>
+        <table>
+          <thead><tr><th>Nombre</th><th>URL</th><th>Eventos</th><th>Último disparo</th><th>Estado</th><th>Acciones</th></tr></thead>
+          <tbody id="webhooksTableBody"><tr><td colspan="6" class="empty-row">No hay webhooks configurados.</td></tr></tbody>
+        </table>
+      </section>
+
+      <!-- ══════════════ DASHBOARD ══════════════ -->
+      <section id="view-dashboard" class="card view">
+        <h2>Dashboard</h2>
+        <div id="dashboardStats" class="dashboard-stats">
+          <div class="stat-card"><div class="stat-value" id="dashExtractions">—</div><div class="stat-label">Extracciones este mes</div></div>
+          <div class="stat-card"><div class="stat-value" id="dashDocuments">—</div><div class="stat-label">Documentos subidos</div></div>
+          <div class="stat-card"><div class="stat-value" id="dashTokens">—</div><div class="stat-label">Tokens consumidos</div></div>
+          <div class="stat-card"><div class="stat-value" id="dashCost">—</div><div class="stat-label">Coste estimado (€)</div></div>
+          <div class="stat-card"><div class="stat-value" id="dashSuccessRate">—</div><div class="stat-label">Tasa de éxito</div></div>
+          <div class="stat-card stat-card--alert"><div class="stat-value" id="dashPendingReview">—</div><div class="stat-label">Pendientes de revisión</div></div>
+        </div>
+        <h3>Extracciones diarias — últimos 30 días</h3>
+        <div id="dashChart" class="dash-chart-wrap">
+          <canvas id="dashChartCanvas" height="120"></canvas>
+        </div>
+      </section>
+
+      <!-- ══════════════ COLA DE REVISIÓN ══════════════ -->
+      <section id="view-review" class="card view">
+        <h2>Cola de revisión</h2>
+        <p class="section-lead">Extracciones marcadas como <strong>pending_review</strong> — bien por fallar una regla de validación automática, bien marcadas manualmente.</p>
+        <div class="actions">
+          <button id="reloadReviewBtn" class="secondary" type="button">Recargar</button>
+        </div>
+        <table>
+          <thead><tr><th>Documento</th><th>Config</th><th>Fecha</th><th>Errores</th><th>Acciones</th></tr></thead>
+          <tbody id="reviewTableBody"><tr><td colspan="5" class="empty-row">No hay extracciones pendientes de revisión.</td></tr></tbody>
+        </table>
+      </section>
+
     </section>
   </main>
 
@@ -858,6 +953,6 @@ Content-Type: application/json
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" crossorigin="anonymous"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" crossorigin="anonymous"></script>
-  <script src="/static/app.js?v=20260528a"></script>
+  <script src="/static/app.js?v=20260530a"></script>
 </body>
 </html>

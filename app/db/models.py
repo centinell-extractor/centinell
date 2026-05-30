@@ -186,6 +186,7 @@ class User(Base):
     password_hash = Column(Text, nullable=False)
     is_active = Column(Boolean, nullable=False, default=True)
     is_global_admin = Column(Boolean, nullable=False, default=False)
+    notify_on_completion = Column(Boolean, nullable=False, default=False)
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
     last_login_at = Column(TIMESTAMP(timezone=True), nullable=True)
 
@@ -348,4 +349,29 @@ class AuditEvent(Base):
         Index("idx_audit_events_actor", "actor_user_id"),
         Index("idx_audit_events_bu", "bu_id"),
         Index("idx_audit_events_created", "created_at"),
+    )
+
+
+class WebhookConfig(Base):
+    """
+    Webhook de salida configurado por BU.
+    Se dispara cuando ocurren eventos de extracción o assessment.
+    La firma HMAC-SHA256 permite al receptor verificar la autenticidad del payload.
+    """
+    __tablename__ = "webhook_configs"
+
+    id               = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    bu_id            = Column(PG_UUID(as_uuid=True), ForeignKey("business_units.id", ondelete="CASCADE"), nullable=False)
+    name             = Column(String(150), nullable=False)
+    url              = Column(String(2000), nullable=False)
+    secret           = Column(String(128), nullable=False)   # HMAC signing secret
+    events           = Column(JSON, nullable=False, default=list)  # ["extraction.completed", ...]
+    is_active        = Column(Boolean, nullable=False, default=True)
+    last_triggered_at = Column(TIMESTAMP(timezone=True), nullable=True)
+    last_status_code  = Column(Integer, nullable=True)
+    created_at       = Column(TIMESTAMP(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        Index("idx_webhooks_bu", "bu_id"),
+        Index("idx_webhooks_active", "is_active"),
     )
