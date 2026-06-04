@@ -17,8 +17,9 @@ def validate_and_clean_response(
     - Limpia y normaliza answer según el tipo de variable
     """
 
-    # Mapa de variables por nombre para poder consultar tipo, required, etc.
+    # Mapa de variables por nombre (exact + case-insensitive fallback)
     var_by_name = {v["name"]: v for v in variables}
+    var_by_name_lower = {v["name"].lower().strip(): v for v in variables}
 
     cleaned: List[Dict[str, Any]] = []
 
@@ -37,10 +38,15 @@ def validate_and_clean_response(
         if title is None:
             raise ResponseValidationError("Falta el campo 'title' en algún elemento.")
 
-        if title not in var_by_name:
+        # Coincidencia exacta primero, luego case-insensitive
+        if title in var_by_name:
+            var_def = var_by_name[title]
+        elif isinstance(title, str) and title.lower().strip() in var_by_name_lower:
+            var_def = var_by_name_lower[title.lower().strip()]
+            title = var_def["name"]  # normalizar al nombre canónico
+        else:
             raise ResponseValidationError(f"Título inesperado en la respuesta: {title}")
 
-        var_def = var_by_name[title]
         var_type = var_def.get("type", "string")
 
         # Normalizar answer

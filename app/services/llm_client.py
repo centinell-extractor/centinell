@@ -19,6 +19,44 @@ logger = logging.getLogger(__name__)
 OPENAI_API_URL = "https://api.openai.com/v1/chat/completions"
 DEFAULT_MODEL = "gpt-4o"
 
+import re as _re
+
+def _extract_json_from_llm_response(raw: str):
+    """
+    Extrae y parsea el primer array JSON de la respuesta del LLM.
+    Tolera texto libre antes/después del JSON (habitual a temperaturas altas).
+    Estrategias en orden:
+      1. json.loads directo (respuesta limpia)
+      2. Extrae entre el primer '[' y el último ']'
+      3. Fallback: busca el bloque ```json ... ``` o ``` ... ```
+    """
+    text = raw.strip()
+
+    # 1. Intento directo
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+
+    # 2. Extraer bloque ```json ... ``` o ``` ... ```
+    fence = _re.search(r"```(?:json)?\s*(\[[\s\S]*?\])\s*```", text, _re.IGNORECASE)
+    if fence:
+        try:
+            return json.loads(fence.group(1))
+        except json.JSONDecodeError:
+            pass
+
+    # 3. Buscar el primer '[' y el último ']' para capturar el array aunque haya texto circundante
+    start = text.find("[")
+    end = text.rfind("]")
+    if start != -1 and end > start:
+        try:
+            return json.loads(text[start:end + 1])
+        except json.JSONDecodeError:
+            pass
+
+    return None
+
 
 class LLMExtractionError(Exception):
     pass
@@ -174,27 +212,16 @@ async def call_llm_for_extraction(
             if not isinstance(content, str):
                 raise LLMExtractionError("Respuesta del LLM: content no es string")
 
-            # Limpiar markdown code blocks si los LLM los devuelven
-            # Algunos LLMs devuelven: ```json [...] ``` en lugar de solo [...]
-            cleaned_content = content.strip()
-            if cleaned_content.startswith("```"):
-                # Remover ```json o ``` al inicio
-                cleaned_content = cleaned_content.lstrip("`").lstrip("json").lstrip("JSON").strip()
-            if cleaned_content.endswith("```"):
-                # Remover ``` al final
-                cleaned_content = cleaned_content.rstrip("`").strip()
+            logger.debug(f"Contenido del LLM (raw): {content[:100]}...")
 
-            logger.debug(f"Contenido del LLM antes de limpiar: {content[:100]}...")
-            logger.debug(f"Contenido del LLM después de limpiar: {cleaned_content[:100]}...")
-
-            # Parsear JSON de la respuesta
-            try:
-                raw_result = json.loads(cleaned_content)
-            except json.JSONDecodeError as e:
-                logger.error(f"JSON inválido recibido del LLM: {cleaned_content[:500]}")
+            # Extraer JSON de la respuesta de forma robusta:
+            # A temperaturas altas el LLM puede añadir texto antes/después del JSON.
+            raw_result = _extract_json_from_llm_response(content)
+            if raw_result is None:
+                logger.error(f"No se encontró JSON en la respuesta del LLM: {content[:500]}")
                 raise LLMExtractionError(
-                    f"No se pudo parsear respuesta como JSON (después de limpiar markdown): {cleaned_content[:150]}..."
-                ) from e
+                    f"No se pudo extraer JSON de la respuesta: {content[:200]}..."
+                )
 
             # Validar y limpiar respuesta
             try:
