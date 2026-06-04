@@ -111,9 +111,9 @@
           <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 5h16v4H4V5zm0 5h16v4H4v-4zm0 5h16v4H4v-4z"/></svg></span>
           <span class="nav-label">Colecciones</span>
         </button>
-        <button class="nav-btn" data-view="configs" title="Configuraciones">
+        <button class="nav-btn" data-view="configs" title="Prompts">
           <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.03 7.03 0 0 0-1.63-.94l-.36-2.54a.5.5 0 0 0-.49-.42h-3.84a.5.5 0 0 0-.49.42l-.36 2.54c-.58.23-1.12.54-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.71 8.84a.5.5 0 0 0 .12.64l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32c.13.22.39.31.6.22l2.39-.96c.5.4 1.05.72 1.63.94l.36 2.54c.05.24.25.42.49.42h3.84c.24 0 .44-.18.49-.42l.36-2.54c.58-.23 1.12-.54 1.63-.94l2.39.96c.22.09.47 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58zM12 15.5A3.5 3.5 0 1 1 12 8a3.5 3.5 0 0 1 0 7.5z"/></svg></span>
-          <span class="nav-label">Configuraciones</span>
+          <span class="nav-label">Prompts</span>
         </button>
         <button class="nav-btn" data-view="assessments" title="Evaluaciones">
           <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2m-6 9 2 2 4-4"/></svg></span>
@@ -411,22 +411,24 @@
 
       <!-- ══════════════ DETALLE DE EVALUACIÓN ══════════════ -->
       <section id="view-assessment-detail" class="card view">
-        <!-- Header -->
-        <div class="assess-detail-header">
-          <button id="assessDetailBackBtn" class="secondary icon-btn" title="Volver a evaluaciones">
-            <svg viewBox="0 0 24 24" aria-hidden="true" style="width:18px;height:18px"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+        <!-- Fila 1: volver -->
+        <div style="margin-bottom:0.75rem">
+          <button id="assessDetailBackBtn" class="secondary" style="display:inline-flex;align-items:center;gap:0.35rem;font-size:0.82rem">
+            <svg viewBox="0 0 24 24" aria-hidden="true" style="width:15px;height:15px;fill:currentColor;flex-shrink:0"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
             Evaluaciones
           </button>
-          <div class="assess-detail-header-body">
-            <h2 id="assessDetailName" style="margin:0"></h2>
-            <p id="assessDetailDesc" class="assess-card-desc" style="margin:0.25rem 0 0"></p>
-            <div id="assessDetailConfigs" class="assess-card-configs" style="margin-top:0.5rem"></div>
-          </div>
-          <div style="display:flex;gap:0.5rem;flex-shrink:0">
+        </div>
+        <!-- Fila 2: nombre + acciones -->
+        <div style="display:flex;align-items:flex-start;gap:1rem;margin-bottom:0.5rem">
+          <h2 id="assessDetailName" style="margin:0;flex:1;min-width:0;word-break:break-word"></h2>
+          <div style="display:flex;gap:0.5rem;flex-shrink:0;padding-top:0.2rem">
             <button id="assessDetailEditBtn" class="secondary" style="display:none">Editar</button>
             <button id="assessDetailDeleteBtn" class="danger" style="display:none">Eliminar</button>
           </div>
         </div>
+        <!-- Fila 3: descripción + configs -->
+        <p id="assessDetailDesc" class="assess-card-desc" style="margin:0 0 0.5rem"></p>
+        <div id="assessDetailConfigs" class="assess-card-configs" style="margin-bottom:1.5rem"></div>
         <div id="assessDetailMessage" class="message" role="status" aria-live="polite"></div>
 
         <!-- Body: run + history -->
@@ -544,19 +546,30 @@
       </section>
 
       <!-- ══════════════════════════════════════════ -->
+      <!-- ══════════════ PROMPTS (lista) ══════════════ -->
       <section id="view-configs" class="card view">
-        <h2>Crear configuración</h2>
-        <div class="grid-2">
-          <label>
-            Elige prompt
-            <select id="configInspectSelect"></select>
-          </label>
-          <button id="refreshInspectConfigsBtn" class="secondary">Recargar lista</button>
+        <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.5rem">
+          <h2 style="margin:0">Prompts</h2>
+          <button id="newPromptBtn" style="margin-left:auto">+ Nuevo prompt</button>
         </div>
-        <div class="actions">
-          <button id="loadConfigToEditorBtn" class="secondary">Cargar en editor</button>
-          <button id="clearEditorBtn" class="secondary">Nuevo borrador</button>
+        <div id="configListMessage" class="message" role="status" aria-live="polite"></div>
+        <div id="configList" class="assess-list">
+          <p class="empty-row">Cargando...</p>
         </div>
+      </section>
+
+      <!-- ══════════════ PROMPT DETALLE / EDITOR ══════════════ -->
+      <section id="view-prompt-detail" class="card view">
+        <!-- Fila 1: volver -->
+        <div style="margin-bottom:0.75rem">
+          <button id="promptDetailBackBtn" class="secondary" style="display:inline-flex;align-items:center;gap:0.35rem;font-size:0.82rem">
+            <svg viewBox="0 0 24 24" aria-hidden="true" style="width:15px;height:15px;fill:currentColor;flex-shrink:0"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+            Prompts
+          </button>
+        </div>
+
+        <!-- Select oculto (compatibilidad interna) -->
+        <select id="configInspectSelect" style="display:none"></select>
 
         <div class="grid-2">
           <label>
@@ -582,6 +595,13 @@
             </select>
           </label>
         </div>
+        <label>
+          Temperatura <span class="field-hint">0 = determinista · 2 = muy creativo</span>
+          <div class="temp-row">
+            <input id="cfgTemperature" type="range" min="0" max="2" step="0.1" value="0">
+            <span id="cfgTemperatureDisplay" class="temp-value">0.0</span>
+          </div>
+        </label>
 
         <label>
           Descripción
@@ -616,23 +636,34 @@
         <pre id="promptPreview" class="detail-box"></pre>
 
         <h3>Variables</h3>
-        <div class="grid-3">
-          <input id="varName" type="text" placeholder="Nombre variable">
-          <input id="varDescription" type="text" placeholder="Descripción">
-          <select id="varType">
-            <option value="string">string</option>
-            <option value="number">number</option>
-          </select>
+        <div class="var-form-row">
+          <label>
+            Nombre
+            <input id="varName" type="text" placeholder="Ej: NumeroFactura">
+          </label>
+          <label class="var-desc-label">
+            Descripción
+            <textarea id="varDescription" rows="2" placeholder="Qué representa este campo en el documento" style="resize:vertical;min-height:2.6rem"></textarea>
+          </label>
+          <label class="var-type-label">
+            Tipo
+            <select id="varType">
+              <option value="string">string</option>
+              <option value="number">number</option>
+            </select>
+          </label>
+          <div class="var-required-wrap">
+            <span class="var-required-label">Obligatoria</span>
+            <label class="toggle-switch" title="Si no se encuentra en el documento, se devolverá como null">
+              <input id="varRequired" type="checkbox" checked>
+              <span class="toggle-track"></span>
+            </label>
+          </div>
         </div>
-        <label>
-          <input id="varRequired" type="checkbox" checked>
-          Variable obligatoria
-          <span class="field-hint">Si no se encuentra en el documento, se devolverá como null.</span>
-        </label>
         <div class="actions">
           <button id="addVariableBtn" class="secondary">Agregar variable</button>
           <button id="updateVariableBtn" class="secondary">Actualizar variable</button>
-          <button id="cancelVariableEditBtn" class="secondary">Cancelar edición variable</button>
+          <button id="cancelVariableEditBtn" class="secondary">Cancelar edición</button>
         </div>
 
         <table>
@@ -649,16 +680,17 @@
         </table>
 
         <div class="actions">
-          <button id="createConfigBtn">Crear configuración</button>
-          <button id="updateConfigBtn" class="secondary">Guardar cambios de configuración</button>
+          <button id="createConfigBtn">Crear prompt</button>
+          <button id="updateConfigBtn" class="secondary">Guardar cambios</button>
+          <button id="clearEditorBtn" class="secondary">Limpiar borrador</button>
         </div>
 
         <div id="configMessage" class="message" role="status" aria-live="polite"></div>
 
         <div id="copyToBuSection" class="copy-to-bu-section" style="display:none">
           <hr class="section-divider">
-          <h3>Copiar configuración a otra BU</h3>
-          <p class="section-lead">Duplica la configuración seleccionada arriba en otra BU (solo admin_global).</p>
+          <h3>Copiar prompt a otra BU</h3>
+          <p class="section-lead">Duplica este prompt en otra BU (solo admin_global).</p>
           <div class="copy-to-bu-row">
             <select id="copyToBuSelect">
               <option value="">Selecciona BU destino</option>
@@ -981,6 +1013,6 @@ Content-Type: application/json
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" crossorigin="anonymous"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" crossorigin="anonymous"></script>
-  <script src="/static/app.js?v=20260604d"></script>
+  <script src="/static/app.js?v=20260604g"></script>
 </body>
 </html>

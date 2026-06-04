@@ -24,7 +24,7 @@ const VIEW_PATHS = {
   run: "/",
   documents: "/docs",
   collections: "/batches",
-  configs: "/settings",
+  configs: "/prompts",
   assessments: "/evals",
   history: "/history",
   audit: "/audit",
@@ -3122,9 +3122,10 @@ const VIEW_PARENT = {
   "doc-detail": "documents",
   "run-detail": "documents",
   "assessment-detail": "assessments",
+  "prompt-detail": "configs",
 };
 
-// Parse current URL into {view, docId?, runId?, assessId?}
+// Parse current URL into {view, docId?, runId?, assessId?, promptId?}
 function parseCurrentPath() {
   const p = location.pathname;
   let m;
@@ -3134,6 +3135,8 @@ function parseCurrentPath() {
   if (m) return { view: "doc-detail", docId: m[1] };
   m = p.match(/^\/evals\/([^/]+)$/);
   if (m) return { view: "assessment-detail", assessId: m[1] };
+  m = p.match(/^\/prompts\/([^/]+)$/);
+  if (m) return { view: "prompt-detail", promptId: m[1] };
   return { view: PATH_TO_VIEW[p] ?? "run" };
 }
 
@@ -3161,6 +3164,8 @@ function activateView(view, historyMode = "push", params = {}) {
     if (view === "doc-detail" && params.docId) path = `/docs/${params.docId}`;
     else if (view === "run-detail" && params.docId && params.runId) path = `/docs/${params.docId}/runs/${params.runId}`;
     else if (view === "assessment-detail" && params.assessId) path = `/evals/${params.assessId}`;
+    else if (view === "prompt-detail" && params.promptId) path = `/prompts/${params.promptId}`;
+    else if (view === "prompt-detail") path = "/prompts/new";
     else path = VIEW_PATHS[view] ?? `/${view}`;
     if (historyMode === "push") history.pushState({ view, ...params }, "", path);
     else history.replaceState({ view, ...params }, "", path);
@@ -3366,12 +3371,74 @@ async function loadConfigs() {
   select.value = preferredId;
   selectInspectOptionByConfigId(preferredId);
 
-  // Si hay una configuración selecciónada en el desplegable, reflejarla en el editor
-  // para que el preview siempre muestre variables reales y no un estado vacío.
-  if (getSelectedInspectConfigId()) {
-    loadSelectedConfigToEditor(getSelectedInspectConfigId());
+  renderConfigList();
+}
+
+// ── Prompt list ───────────────────────────────────────────────────────────
+
+function renderConfigList() {
+  const container = el("configList");
+  if (!container) return;
+  const configs = Object.values(state.configsById || {});
+  if (!configs.length) {
+    container.innerHTML = '<p class="empty-row">No hay prompts. Crea el primero.</p>';
+    return;
+  }
+  container.innerHTML = "";
+  configs.forEach((cfg) => {
+    const id = getConfigIdFromObject(cfg);
+    const varCount = Array.isArray(cfg.variables) ? cfg.variables.length : 0;
+    const card = document.createElement("div");
+    card.className = "assess-card";
+    card.setAttribute("role", "button");
+    card.setAttribute("tabindex", "0");
+    card.innerHTML = `
+      <div class="assess-card-header">
+        <span class="assess-card-name">${escapeHtml(cfg.name)}</span>
+        <div class="assess-card-actions">
+          <span class="assess-config-tag" style="font-size:0.72rem">${escapeHtml(cfg.model || "")}</span>
+          <svg class="assess-card-chevron" viewBox="0 0 24 24" aria-hidden="true" style="width:16px;height:16px;color:var(--text-3);fill:currentColor;flex-shrink:0"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+        </div>
+      </div>
+      ${cfg.description ? `<p class="assess-card-desc">${escapeHtml(cfg.description)}</p>` : ""}
+      <div class="assess-card-configs">
+        <span style="font-size:0.75rem;color:var(--text-3)">${varCount} variable${varCount !== 1 ? "s" : ""}</span>
+      </div>`;
+    const navigate = () => {
+      activateView("prompt-detail", "push", { promptId: id });
+      loadPromptDetail(id);
+    };
+    card.addEventListener("click", navigate);
+    card.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate(); }
+    });
+    container.appendChild(card);
+  });
+}
+
+function loadPromptDetail(configId) {
+  if (!configId || configId === "new") {
+    clearConfigEditor();
+    return;
+  }
+  const config = state.configsById[normalizeConfigId(configId)]
+    || Object.values(state.configsById).find((c) => String(c.id) === String(configId));
+  if (config) {
+    loadSelectedConfigToEditor(getConfigIdFromObject(config));
+  } else {
+    loadConfigs().then(() => {
+      const c2 = state.configsById[normalizeConfigId(configId)];
+      if (c2) loadSelectedConfigToEditor(getConfigIdFromObject(c2));
+    });
   }
 }
+
+function openNewPrompt() {
+  clearConfigEditor();
+  activateView("prompt-detail", "push", {});
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 function loadSelectedConfigToEditor(configIdOverride) {
   const configId = normalizeConfigId(configIdOverride || getSelectedInspectConfigId());
@@ -3393,6 +3460,8 @@ function loadSelectedConfigToEditor(configIdOverride) {
   el("cfgPromptBase").value = promptSections.baseInstructions;
   syncResponseFormatModeFromText(promptSections.responseFormat);
   el("cfgModel").value = config.model || "gpt-4o";
+  const tempVal = parseFloat(config.temperature ?? 0);
+  if (el("cfgTemperature")) { el("cfgTemperature").value = tempVal; el("cfgTemperatureDisplay").textContent = tempVal.toFixed(1); }
   state.variablesDraft = Array.isArray(config.variables)
     ? config.variables.map((v) => ({
         name: v.name,
@@ -3421,6 +3490,7 @@ function clearConfigEditor(options = {}) {
   el("cfgPromptBase").value = promptSections.baseInstructions;
   syncResponseFormatModeFromText(promptSections.responseFormat);
   el("cfgModel").value = "gpt-4o";
+  if (el("cfgTemperature")) { el("cfgTemperature").value = 0; el("cfgTemperatureDisplay").textContent = "0.0"; }
   clearVariableInputs();
   renderVariablesDraft();
   renderPromptPreview();
@@ -3977,7 +4047,7 @@ async function createConfig() {
     base_prompt: composedPrompt,
     variables: state.variablesDraft,
     model: el("cfgModel").value.trim() || "gpt-4o",
-    temperature: 0.0,
+    temperature: parseFloat(el("cfgTemperature")?.value ?? 0),
   };
 
   if (!payload.name) {
@@ -4010,9 +4080,10 @@ async function createConfig() {
       body: JSON.stringify(payload),
     });
 
-    setMessage("configMessage", `Configuración creada: ${created.id}`, "success");
-    clearConfigEditor();
+    setMessage("configMessage", `Prompt creado`, "success");
     await loadConfigs();
+    activateView("prompt-detail", "replace", { promptId: String(created.id) });
+    loadPromptDetail(String(created.id));
   } catch (error) {
     setMessage("configMessage", `Error: ${error.message}`, "error");
   }
@@ -4041,7 +4112,7 @@ async function updateConfig() {
     base_prompt: composedPrompt,
     variables: state.variablesDraft,
     model: el("cfgModel").value.trim() || "gpt-4o",
-    temperature: 0.0,
+    temperature: parseFloat(el("cfgTemperature")?.value ?? 0),
   };
 
   if (!payload.name) {
@@ -4082,6 +4153,7 @@ async function updateConfig() {
     await loadConfigs();
     selectInspectOptionByConfigId(updated.id);
     loadSelectedConfigToEditor(String(updated.id));
+    history.replaceState({ view: "prompt-detail", promptId: String(updated.id) }, "", `/prompts/${updated.id}`);
   } catch (error) {
     setMessage("configMessage", `Error: ${error.message}`, "error");
   }
@@ -4651,13 +4723,14 @@ function wireNavigation() {
       if (btn.dataset.view === "documents") { loadDocuments(); }
       if (btn.dataset.view === "collections") { loadColConfigs(); loadColHistory(); }
       if (btn.dataset.view === "assessments") { loadAssessments(); populateAssessConfigSelect(); }
+      if (btn.dataset.view === "configs") loadConfigs();
       if (btn.dataset.view === "dashboard") loadDashboard();
     });
   });
 
   window.addEventListener("popstate", (event) => {
     const parsed = event.state?.view ? event.state : parseCurrentPath();
-    const { view, docId, runId, assessId } = parsed;
+    const { view, docId, runId, assessId, promptId } = parsed;
     activateView(view, "none", parsed);
     if (view === "apikeys" && canManageApiKeys()) loadApiKeys();
     if (view === "webhooks") loadWebhooks();
@@ -4667,7 +4740,10 @@ function wireNavigation() {
     if (view === "documents") loadDocuments();
     if (view === "collections") { loadColConfigs(); loadColHistory(); }
     if (view === "assessments") { loadAssessments(); populateAssessConfigSelect(); }
+    if (view === "configs") loadConfigs();
     if (view === "assessment-detail" && assessId) loadAssessmentDetail(assessId);
+    if (view === "prompt-detail" && promptId) loadPromptDetail(promptId);
+    if (view === "prompt-detail" && !promptId) openNewPrompt();
     if (view === "doc-detail" && docId) loadDocumentDetail(docId);
     if (view === "run-detail" && docId && runId) loadRunDetail(docId, runId);
   });
@@ -4683,6 +4759,15 @@ function wireActions() {
 
   on("dashPrevMonth", "click", () => _dashShiftMonth(-1));
   on("dashNextMonth", "click", () => _dashShiftMonth(1));
+  on("cfgTemperature", "input", () => {
+    const v = parseFloat(el("cfgTemperature").value).toFixed(1);
+    el("cfgTemperatureDisplay").textContent = v;
+  });
+  on("newPromptBtn", "click", openNewPrompt);
+  on("promptDetailBackBtn", "click", () => {
+    activateView("configs", "push");
+    loadConfigs();
+  });
   on("assessDetailBackBtn", "click", () => {
     activateView("assessments", "push");
     loadAssessments();
@@ -4741,7 +4826,6 @@ function wireActions() {
 
     loadDocuments();
   });
-  on("refreshInspectConfigsBtn", "click", loadConfigs);
   on("configInspectSelect", "change", () => {
     loadSelectedConfigToEditor(getSelectedInspectConfigId());
   });
@@ -4757,8 +4841,7 @@ function wireActions() {
     setResponseFormatMode(el("cfgResponseFormatMode").value);
     renderPromptPreview();
   });
-  on("loadConfigToEditorBtn", "click", () => loadSelectedConfigToEditor(getSelectedInspectConfigId()));
-  on("clearEditorBtn", "click", clearConfigEditor);
+  on("clearEditorBtn", "click", () => { clearConfigEditor(); history.replaceState({ view: "prompt-detail" }, "", "/prompts/new"); });
   on("parseFileBtn", "click", parseUploadedFile);
   on("runExtractionBtn", "click", runExtraction);
   on("saveValidationBtn", "click", saveValidation);
@@ -4944,12 +5027,14 @@ async function bootstrap() {
     await loadAssessments();
     await loadColConfigs();
     populateAssessConfigSelect();
-    const { docId: iDocId, runId: iRunId, assessId: iAssessId } = initialParsed;
+    const { docId: iDocId, runId: iRunId, assessId: iAssessId, promptId: iPromptId } = initialParsed;
     const activeView = document.querySelector(".view.active")?.id?.replace("view-", "");
     if (activeView === "documents") loadDocuments();
     else if (activeView === "doc-detail" && iDocId) loadDocumentDetail(iDocId);
     else if (activeView === "run-detail" && iDocId && iRunId) loadRunDetail(iDocId, iRunId);
     else if (activeView === "assessment-detail" && iAssessId) loadAssessmentDetail(iAssessId);
+    else if (activeView === "prompt-detail" && iPromptId) loadPromptDetail(iPromptId);
+    else if (activeView === "prompt-detail") openNewPrompt();
   } finally {
     document.body.classList.remove("auth-loading");
   }

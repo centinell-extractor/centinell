@@ -1506,6 +1506,87 @@ tbody tr:hover { background: #f8f9fd; }
   cursor: default;
 }
 
+/* ── Toggle switch ──────────────────────────────────────────── */
+
+.toggle-switch {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+}
+.toggle-switch input { position: absolute; opacity: 0; width: 0; height: 0; }
+.toggle-track {
+  width: 36px;
+  height: 20px;
+  background: var(--border-2);
+  border-radius: 10px;
+  position: relative;
+  transition: background 0.18s;
+  flex-shrink: 0;
+}
+.toggle-track::after {
+  content: "";
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  background: #fff;
+  border-radius: 50%;
+  top: 3px;
+  left: 3px;
+  transition: transform 0.18s;
+  box-shadow: 0 1px 3px rgba(0,0,0,.25);
+}
+.toggle-switch input:checked + .toggle-track { background: var(--brand); }
+.toggle-switch input:checked + .toggle-track::after { transform: translateX(16px); }
+
+/* ── Variable form row ──────────────────────────────────────── */
+
+.var-form-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+.var-form-row > label { flex: 1; min-width: 120px; margin: 0; }
+.var-desc-label { flex: 2 !important; }
+.var-type-label { flex: 0 0 110px !important; min-width: 0 !important; }
+.var-required-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding-bottom: 4px;
+  flex-shrink: 0;
+}
+.var-required-label {
+  font-size: 0.72rem;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* ── Temperatura ────────────────────────────────────────────── */
+
+.temp-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.3rem;
+}
+.temp-row input[type=range] {
+  flex: 1;
+  accent-color: var(--brand);
+  cursor: pointer;
+}
+.temp-value {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--brand);
+  min-width: 2.5rem;
+  text-align: right;
+}
+
 /* ── Assessments View ───────────────────────────────────────── */
 
 .assess-layout {
@@ -1516,18 +1597,6 @@ tbody tr:hover { background: #f8f9fd; }
 }
 
 /* Detail view */
-.assess-detail-header {
-  display: flex;
-  align-items: flex-start;
-  gap: 1rem;
-  margin-bottom: 1.5rem;
-  flex-wrap: wrap;
-}
-
-.assess-detail-header-body {
-  flex: 1;
-  min-width: 0;
-}
 
 .assess-detail-layout {
   display: grid;
