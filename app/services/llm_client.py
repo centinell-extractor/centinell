@@ -146,11 +146,14 @@ async def call_llm_for_extraction(
         "Content-Type": "application/json",
     }
 
-    payload = {
+    # Los modelos de razonamiento (o-series) no aceptan el parámetro temperature
+    _no_temp_models = {"o1", "o1-mini", "o1-preview", "o3", "o3-mini", "o4-mini"}
+    payload: dict = {
         "model": model,
-        "temperature": max(0.0, min(2.0, float(temperature))),
         "messages": [system_message, user_message],
     }
+    if model not in _no_temp_models:
+        payload["temperature"] = max(0.0, min(2.0, float(temperature)))
 
     # Retry logic con exponential backoff
     last_error = None
