@@ -38,14 +38,16 @@ def validate_and_clean_response(
         if title is None:
             raise ResponseValidationError("Falta el campo 'title' en algún elemento.")
 
-        # Coincidencia exacta primero, luego case-insensitive
+        # Coincidencia exacta → case-insensitive → aceptar como string desconocido
         if title in var_by_name:
             var_def = var_by_name[title]
         elif isinstance(title, str) and title.lower().strip() in var_by_name_lower:
             var_def = var_by_name_lower[title.lower().strip()]
             title = var_def["name"]  # normalizar al nombre canónico
         else:
-            raise ResponseValidationError(f"Título inesperado en la respuesta: {title}")
+            # Título no pedido: el LLM extrajo algo extra. Lo incluimos tal cual
+            # en lugar de rechazar toda la extracción.
+            var_def = {"type": "string"}
 
         var_type = var_def.get("type", "string")
 
