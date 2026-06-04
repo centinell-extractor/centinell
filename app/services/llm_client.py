@@ -58,6 +58,7 @@ async def call_llm_for_extraction(
     model: str = DEFAULT_MODEL,
     base_prompt: Optional[str] = None,
     timeout_seconds: Optional[int] = None,
+    temperature: float = 0.0,
 ) -> LLMExtractionResult:
     """
     Construye el prompt con el template engine, llama al modelo de IA con retry logic
@@ -109,7 +110,7 @@ async def call_llm_for_extraction(
 
     payload = {
         "model": model,
-        "temperature": 0.0,
+        "temperature": max(0.0, min(2.0, float(temperature))),
         "messages": [system_message, user_message],
     }
 
@@ -281,6 +282,7 @@ async def call_llm_for_extraction_chained(
     model: str = DEFAULT_MODEL,
     base_prompt: Optional[str] = None,
     timeout_seconds: Optional[int] = None,
+    temperature: float = 0.0,
 ) -> LLMExtractionResult:
     """
     Versión encadenada de call_llm_for_extraction.
@@ -296,7 +298,7 @@ async def call_llm_for_extraction_chained(
 
     if not has_deps:
         return await call_llm_for_extraction(
-            document_text, variables, model, base_prompt, timeout_seconds
+            document_text, variables, model, base_prompt, timeout_seconds, temperature
         )
 
     rounds = _toposort_rounds(variables)
@@ -331,7 +333,7 @@ async def call_llm_for_extraction_chained(
         )
 
         round_result = await call_llm_for_extraction(
-            document_text, interpolated, model, base_prompt, timeout_seconds
+            document_text, interpolated, model, base_prompt, timeout_seconds, temperature
         )
 
         all_prompts.append(round_result["prompt_sent"])

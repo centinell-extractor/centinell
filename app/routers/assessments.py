@@ -80,11 +80,22 @@ async def _run_assessment_background(
             async def _run_one(entry: dict) -> dict:
                 t0 = time.perf_counter()
                 try:
+                    if not entry["variables"]:
+                        return {
+                            "config_id": entry["config_id"],
+                            "config_name": entry["config_name"],
+                            "position": entry["position"],
+                            "result": [],
+                            "latency_ms": 0,
+                            "tokens": 0,
+                            "error": "Este prompt no tiene variables definidas",
+                        }
                     llm = await call_llm_for_extraction_chained(
                         document_text=document_text,
                         variables=entry["variables"],
                         model=entry["model"],
                         base_prompt=entry["base_prompt"],
+                        temperature=entry.get("temperature", 0.0),
                     )
                     return {
                         "config_id": entry["config_id"],
@@ -452,9 +463,10 @@ async def run_assessment(
                 "config_id": str(cfg.id),
                 "config_name": cfg.name,
                 "position": brief.position,
-                "variables": cfg.variables,
+                "variables": cfg.variables or [],
                 "model": cfg.model,
                 "base_prompt": cfg.base_prompt,
+                "temperature": float(cfg.temperature or 0.0),
             })
 
     run = AssessmentRun(

@@ -2376,7 +2376,21 @@ function _applyPdfHighlights(items, idxList) {
   for (let i = 0; i < idxList.length; i++) {
     _drawHighlightItem(items[idxList[i]], i === 0 ? 'rgba(255,110,0,0.7)' : 'rgba(255,210,0,0.55)');
   }
-  items[idxList[0]].pageDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+  // Scroll al texto resaltado exacto, no a la página entera
+  const first = items[idxList[0]];
+  const t = first.transform;
+  const vp = first.viewport;
+  const [, vy] = vp.convertToViewportPoint(t[4], t[5]);
+  const scaleX = Math.sqrt(t[0] * t[0] + t[1] * t[1]);
+  const fontH = scaleX * vp.scale * 1.15;
+  const topInPage = Math.max(0, vy - fontH - 60); // 60px de margen superior
+
+  const anchor = document.createElement("div");
+  anchor.style.cssText = `position:absolute;top:${topInPage}px;left:0;width:1px;height:${fontH + 120}px;pointer-events:none;`;
+  first.pageDiv.appendChild(anchor);
+  anchor.scrollIntoView({ behavior: "smooth", block: "center" });
+  setTimeout(() => anchor.remove(), 800);
 }
 
 function escapeHtml(str) {
@@ -3739,7 +3753,7 @@ function focusDocumentMatch(rawTerm) {
 
   const match = document.querySelector("#resultDocumentPreview .doc-highlight-match");
   if (match) {
-    match.scrollIntoView({ block: "center", behavior: "smooth" });
+    match.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }
 }
 
