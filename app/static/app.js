@@ -3476,6 +3476,7 @@ function loadSelectedConfigToEditor(configIdOverride) {
   el("cfgModel").value = config.model || "gpt-4o";
   const tempVal = parseFloat(config.temperature ?? 0);
   if (el("cfgTemperature")) { el("cfgTemperature").value = tempVal; el("cfgTemperatureDisplay").textContent = tempVal.toFixed(1); }
+  _updateTemperatureVisibility(config.model || "gpt-4o");
   state.variablesDraft = Array.isArray(config.variables)
     ? config.variables.map((v) => ({
         name: v.name,
@@ -3505,6 +3506,7 @@ function clearConfigEditor(options = {}) {
   syncResponseFormatModeFromText(promptSections.responseFormat);
   el("cfgModel").value = "gpt-4o";
   if (el("cfgTemperature")) { el("cfgTemperature").value = 0; el("cfgTemperatureDisplay").textContent = "0.0"; }
+  _updateTemperatureVisibility("gpt-4o");
   clearVariableInputs();
   renderVariablesDraft();
   renderPromptPreview();
@@ -4763,6 +4765,14 @@ function wireNavigation() {
   });
 }
 
+const _NO_TEMP_MODELS = new Set(["o1", "o1-mini", "o1-preview", "o3", "o3-mini", "o4-mini"]);
+
+function _updateTemperatureVisibility(model) {
+  const wrap = el("cfgTemperatureWrap");
+  if (!wrap) return;
+  wrap.style.display = _NO_TEMP_MODELS.has(model) ? "none" : "";
+}
+
 function wireActions() {
   const on = (id, eventName, handler) => {
     const node = el(id);
@@ -4777,6 +4787,7 @@ function wireActions() {
     const v = parseFloat(el("cfgTemperature").value).toFixed(1);
     el("cfgTemperatureDisplay").textContent = v;
   });
+  on("cfgModel", "change", () => _updateTemperatureVisibility(el("cfgModel").value));
   on("newPromptBtn", "click", openNewPrompt);
   on("promptDetailBackBtn", "click", () => {
     activateView("configs", "push");
