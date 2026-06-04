@@ -25,6 +25,7 @@ from app.services.llm_client import call_llm_for_extraction_chained
 from app.services.run_enricher import enrich_assessment_runs
 from app.services.webhook import dispatch as webhook_dispatch
 from app.services.email import send_assessment_complete_email
+from app.services.usage_service import TOKENS_CONSUMED, track_event
 from app.db.models import User as UserModel
 
 logger = logging.getLogger(__name__)
@@ -91,6 +92,7 @@ async def _run_assessment_background(
                         "position": entry["position"],
                         "result": llm["cleaned"],
                         "latency_ms": int((time.perf_counter() - t0) * 1000),
+                        "tokens": llm.get("total_tokens", 0),
                         "error": None,
                     }
                 except Exception as exc:
@@ -100,11 +102,13 @@ async def _run_assessment_background(
                         "position": entry["position"],
                         "result": [],
                         "latency_ms": int((time.perf_counter() - t0) * 1000),
+                        "tokens": 0,
                         "error": str(exc)[:300],
                     }
 
             combined = await asyncio.gather(*[_run_one(e) for e in config_entries])
             combined = sorted(combined, key=lambda x: x["position"])
+            total_tokens = sum(c.get("tokens", 0) for c in combined)
 
             run = await db.get(AssessmentRun, run_id)
             if run:
@@ -112,6 +116,8 @@ async def _run_assessment_background(
                 run.combined_result = combined
                 run.latency_ms = int((time.perf_counter() - start) * 1000)
                 db.add(run)
+                if total_tokens:
+                    await track_event(db, bu_id=run.bu_id, event_type=TOKENS_CONSUMED, quantity=total_tokens)
                 await db.commit()
 
                 if run.created_by:

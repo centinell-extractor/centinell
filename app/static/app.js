@@ -530,58 +530,198 @@ async function createUserInCurrentBu() {
 
 // ══════════════════════════════ DASHBOARD ══════════════════════════════════
 
-async function loadDashboard() {
+const _dashState = { month: null };
+
+async function loadDashboard(month) {
   if (!hasSession() || !state.selectedBuId) return;
+  const qs = month ? `?month=${month}` : "";
   try {
-    const data = await api("/reports/dashboard");
-    el("dashExtractions").textContent = data.extractions_this_month ?? "—";
+    const data = await api(`/reports/dashboard${qs}`);
+
+    _dashState.month = data.month_key;
+
+    // Header: periodo + navegación
+    if (el("dashPeriod")) el("dashPeriod").textContent = data.month || "";
+    const prevBtn = el("dashPrevMonth");
+    const nextBtn = el("dashNextMonth");
+    if (prevBtn) prevBtn.disabled = data.month_key <= data.earliest_month;
+    if (nextBtn) nextBtn.disabled = data.month_key >= data.current_month;
+
+    // Tarjetas
+    el("dashRuns").textContent = data.runs_this_month ?? "—";
     el("dashDocuments").textContent = data.documents_this_month ?? "—";
-    el("dashTokens").textContent = (data.tokens_this_month ?? 0).toLocaleString();
-    el("dashCost").textContent = `${(data.estimated_cost_eur ?? 0).toFixed(4)} €`;
-    el("dashSuccessRate").textContent = `${data.success_rate_pct ?? 0}%`;
-    el("dashPendingReview").textContent = data.pending_review ?? 0;
+    el("dashSuccessRate").textContent =
+      data.runs_this_month ? `${data.success_rate_pct ?? 0}%` : "—";
+    const lat = data.avg_latency_ms ?? 0;
+    el("dashLatency").textContent = lat
+      ? lat >= 1000 ? `${(lat / 1000).toFixed(1)}s` : `${lat}ms`
+      : "—";
+    const tok = data.tokens_this_month ?? 0;
+    el("dashTokens").textContent = tok ? tok.toLocaleString() : "—";
+    const cost = data.estimated_cost_eur ?? 0;
+    el("dashCost").textContent = cost ? `${cost.toFixed(4)} €` : "—";
+
     renderDashChart(data.daily_trend || []);
   } catch (e) {
-    el("dashExtractions").textContent = "Error";
+    el("dashRuns").textContent = "Error";
   }
+}
+
+function _dashShiftMonth(delta) {
+  const [y, m] = (_dashState.month || "").split("-").map(Number);
+  if (!y) return loadDashboard();
+  const d = new Date(y, m - 1 + delta, 1);
+  const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  loadDashboard(key);
 }
 
 function renderDashChart(daily) {
   const canvas = el("dashChartCanvas");
   if (!canvas) return;
-  const ctx = canvas.getContext("2d");
-  const W = canvas.parentElement.clientWidth || 600;
-  canvas.width = W; canvas.height = 120;
-  if (!daily.length) { ctx.fillStyle = "var(--text-3)"; ctx.fillText("Sin datos", 10, 60); return; }
-  const maxVal = Math.max(...daily.map(d => d.extractions), 1);
-  const pad = { l: 28, r: 10, t: 10, b: 28 };
-  const chartW = W - pad.l - pad.r;
-  const chartH = 120 - pad.t - pad.b;
-  const barW = Math.max(2, chartW / daily.length - 2);
-  ctx.clearRect(0, 0, W, 120);
-  // Grid lines
-  ctx.strokeStyle = getComputedStyle(document.body).getPropertyValue("--border") || "#e2e6f0";
-  ctx.lineWidth = 1;
-  [0, 0.5, 1].forEach(f => {
-    const y = pad.t + chartH * (1 - f);
-    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(W - pad.r, y); ctx.stroke();
-  });
-  // Bars
-  ctx.fillStyle = "#7c3aed";
-  daily.forEach((d, i) => {
-    const x = pad.l + i * (chartW / daily.length);
-    const h = (d.extractions / maxVal) * chartH;
-    ctx.fillRect(x, pad.t + chartH - h, barW, h);
-  });
-  // X labels (first and last)
-  ctx.fillStyle = getComputedStyle(document.body).getPropertyValue("--text-3") || "#7080a0";
-  ctx.font = "10px sans-serif";
-  if (daily.length) {
-    ctx.fillText(daily[0].date.slice(5), pad.l, 120 - 8);
-    ctx.textAlign = "right";
-    ctx.fillText(daily[daily.length - 1].date.slice(5), W - pad.r, 120 - 8);
-    ctx.textAlign = "left";
+
+  // Clonar el canvas para eliminar listeners previos
+  const fresh = canvas.cloneNode(false);
+  canvas.parentNode.replaceChild(fresh, canvas);
+  const c = fresh;
+
+  const ctx = c.getContext("2d");
+  const dpr = window.devicePixelRatio || 1;
+  const W = c.parentElement.clientWidth || 600;
+  const H = 180;
+  c.width = W * dpr;
+  c.height = H * dpr;
+  c.style.height = H + "px";
+  ctx.scale(dpr, dpr);
+
+  const isDark = document.body.classList.contains("dark");
+  const col = {
+    grid:      isDark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.07)",
+    text:      isDark ? "rgba(255,255,255,0.35)" : "rgba(0,0,0,0.4)",
+    line:      "#7c3aed",
+    fill:      isDark ? "rgba(124,58,237,0.18)" : "rgba(124,58,237,0.12)",
+    dotBorder: isDark ? "#1a1a2e" : "#ffffff",
+    tooltip:   isDark ? "rgba(30,20,50,0.92)" : "rgba(255,255,255,0.96)",
+    tooltipBorder: "#7c3aed",
+  };
+
+  const pad = { l: 36, r: 16, t: 16, b: 30 };
+  const cW = W - pad.l - pad.r;
+  const cH = H - pad.t - pad.b;
+
+  function draw(hoverIdx) {
+    ctx.clearRect(0, 0, W, H);
+
+    if (!daily.length) {
+      ctx.fillStyle = col.text;
+      ctx.font = "13px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("Sin datos en los últimos 30 días", W / 2, H / 2);
+      return;
+    }
+
+    const maxVal = Math.max(...daily.map(d => d.runs), 1);
+    const n = daily.length;
+    const xs = daily.map((_, i) => pad.l + (n === 1 ? cW / 2 : (i / (n - 1)) * cW));
+    const ys = daily.map(d => pad.t + cH * (1 - d.runs / maxVal));
+
+    // Grid + y-axis
+    const yTicks = maxVal <= 4 ? maxVal : 4;
+    for (let i = 0; i <= yTicks; i++) {
+      const f = i / yTicks;
+      const y = pad.t + cH * (1 - f);
+      ctx.strokeStyle = col.grid; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(W - pad.r, y); ctx.stroke();
+      if (i > 0) {
+        ctx.fillStyle = col.text; ctx.font = "10px sans-serif"; ctx.textAlign = "right";
+        ctx.fillText(Math.round(maxVal * f), pad.l - 5, y + 3.5);
+      }
+    }
+
+    // Area fill
+    ctx.beginPath();
+    ctx.moveTo(xs[0], pad.t + cH);
+    xs.forEach((x, i) => ctx.lineTo(x, ys[i]));
+    ctx.lineTo(xs[n - 1], pad.t + cH);
+    ctx.closePath();
+    ctx.fillStyle = col.fill; ctx.fill();
+
+    // Line
+    ctx.beginPath();
+    ctx.strokeStyle = col.line; ctx.lineWidth = 2;
+    ctx.lineJoin = "round"; ctx.lineCap = "round";
+    xs.forEach((x, i) => i === 0 ? ctx.moveTo(x, ys[i]) : ctx.lineTo(x, ys[i]));
+    ctx.stroke();
+
+    // Dots
+    if (n <= 45) {
+      xs.forEach((x, i) => {
+        const isHover = i === hoverIdx;
+        ctx.beginPath();
+        ctx.arc(x, ys[i], isHover ? 5 : 3, 0, Math.PI * 2);
+        ctx.fillStyle = col.line; ctx.fill();
+        ctx.strokeStyle = col.dotBorder; ctx.lineWidth = isHover ? 2 : 1.5; ctx.stroke();
+      });
+    }
+
+    // X-axis labels
+    ctx.fillStyle = col.text; ctx.font = "10px sans-serif";
+    const step = Math.max(1, Math.ceil(n / Math.floor(cW / 48)));
+    daily.forEach((d, i) => {
+      if (i % step !== 0 && i !== n - 1) return;
+      ctx.textAlign = i === 0 ? "left" : i === n - 1 ? "right" : "center";
+      ctx.fillText(d.date.slice(5), xs[i], H - 7);
+    });
+
+    // Hover: línea vertical + tooltip
+    if (hoverIdx !== null && hoverIdx >= 0 && hoverIdx < n) {
+      const hx = xs[hoverIdx];
+      const hy = ys[hoverIdx];
+      const d = daily[hoverIdx];
+
+      // Línea guía
+      ctx.strokeStyle = "rgba(124,58,237,0.35)"; ctx.lineWidth = 1;
+      ctx.setLineDash([4, 3]);
+      ctx.beginPath(); ctx.moveTo(hx, pad.t); ctx.lineTo(hx, pad.t + cH); ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Tooltip box
+      const label = `${d.date.slice(5)}  ·  ${d.runs} ejecución${d.runs !== 1 ? "es" : ""}`;
+      ctx.font = "bold 11px sans-serif";
+      const tw = ctx.measureText(label).width;
+      const bw = tw + 20, bh = 26, br = 5;
+      let bx = hx - bw / 2;
+      bx = Math.max(pad.l, Math.min(bx, W - pad.r - bw));
+      const by = Math.max(pad.t + 2, hy - bh - 10);
+
+      ctx.fillStyle = col.tooltip;
+      ctx.strokeStyle = col.tooltipBorder;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.roundRect(bx, by, bw, bh, br);
+      ctx.fill(); ctx.stroke();
+
+      ctx.fillStyle = col.line;
+      ctx.textAlign = "center";
+      ctx.fillText(label, bx + bw / 2, by + 17);
+    }
   }
+
+  draw(null);
+
+  if (!daily.length) return;
+
+  const n = daily.length;
+  const xs = daily.map((_, i) => pad.l + (n === 1 ? cW / 2 : (i / (n - 1)) * cW));
+
+  c.addEventListener("mousemove", (e) => {
+    const rect = c.getBoundingClientRect();
+    const mx = (e.clientX - rect.left) * (W / rect.width);
+    let closest = 0, minDist = Infinity;
+    xs.forEach((x, i) => { const d = Math.abs(x - mx); if (d < minDist) { minDist = d; closest = i; } });
+    draw(minDist < cW / n + 10 ? closest : null);
+  });
+
+  c.addEventListener("mouseleave", () => draw(null));
 }
 
 // ══════════════════════════════ WEBHOOKS ════════════════════════════════════
@@ -1122,12 +1262,14 @@ async function login(event) {
     }
 
     await loadConfigs();
+    await loadAssessments();
     await loadColConfigs();
 
     setAuthAlert(false);
     setAuthMessage("");
     setMessage("runMessage", "", "idle");
     await loadHistory();
+    loadDocuments();
   } catch (error) {
     if (String(error.message).includes("Sin unidad de negocio asignada")) {
       setAuthAlert(true, error.message);
@@ -2438,11 +2580,11 @@ function toggleBatchMode() {
   el("docsCheckHeader").style.display = _batchMode ? "" : "none";
   el("batchBar").style.display = _batchMode ? "" : "none";
   if (!_batchMode) el("docsSelectAll").checked = false;
-  // Populate config select
   if (_batchMode) {
-    const sel = el("batchConfigSelect");
-    sel.innerHTML = '<option value="">Selecciona config…</option>' +
-      Object.values(state.configsById || {}).map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join("");
+    const sel = el("batchAssessSelect");
+    const assessments = (state.assessments || []).filter((a) => a.is_active);
+    sel.innerHTML = '<option value="">Selecciona evaluación…</option>' +
+      assessments.map(a => `<option value="${a.id}">${escapeHtml(a.name)}</option>`).join("");
   }
   renderDocumentsList();
 }
@@ -2453,16 +2595,26 @@ function updateBatchCount() {
 }
 
 async function runBatch() {
-  const configId = el("batchConfigSelect").value;
-  if (!configId) { setMessage("docsMessage", "Selecciona una configuración", "error"); return; }
+  const assessId = el("batchAssessSelect").value;
+  if (!assessId) { setMessage("docsMessage", "Selecciona una evaluación", "error"); return; }
   const ids = [...document.querySelectorAll(".doc-batch-check:checked")].map(c => c.dataset.docId);
   if (!ids.length) { setMessage("docsMessage", "Selecciona al menos un documento", "error"); return; }
-  try {
-    setMessage("docsMessage", "Encolando extracciones…", "idle");
-    const res = await api("/extract/batch", { method: "POST", body: JSON.stringify({ config_id: configId, document_ids: ids }) });
-    setMessage("docsMessage", `Encoladas ${res.queued} extracción(es). Omitidas: ${res.skipped.length}`, "ok");
-    toggleBatchMode();
-  } catch (e) { setMessage("docsMessage", `Error: ${e.message}`, "error"); }
+
+  setMessage("docsMessage", `Lanzando evaluación en ${ids.length} documento(s)…`, "idle");
+  let ok = 0, errors = 0;
+  for (const docId of ids) {
+    const doc = state.docsItems.find((d) => d.id === docId);
+    if (!doc?.ocr_text?.trim()) { errors++; continue; }
+    try {
+      await api(`/assessments/${assessId}/run`, {
+        method: "POST",
+        body: JSON.stringify({ document_text: doc.ocr_text, document_name: doc.filename, document_id: doc.id }),
+      });
+      ok++;
+    } catch (_) { errors++; }
+  }
+  setMessage("docsMessage", `Encoladas ${ok} evaluación(es)${errors ? `. Omitidas: ${errors}` : ""}.`, ok ? "success" : "error");
+  toggleBatchMode();
 }
 
 function renderDocumentsList() {
@@ -2879,10 +3031,8 @@ async function loadConfigs() {
     clearConfigEditor({ silent: true });
     const select = el("configSelect");
     const inspectSelect = el("configInspectSelect");
-    const colSelect = el("colConfigSelect");
     select.innerHTML = '<option value="">Haz login y seleccióna una BU</option>';
     inspectSelect.innerHTML = '<option value="">Haz login y seleccióna una BU</option>';
-    if (colSelect) colSelect.innerHTML = '<option value="">Haz login y seleccióna una BU</option>';
     return;
   }
 
@@ -2913,10 +3063,8 @@ async function loadConfigs() {
   );
   const select = el("configSelect");
   const inspectSelect = el("configInspectSelect");
-  const colSelect = el("colConfigSelect");
   select.innerHTML = "";
   inspectSelect.innerHTML = "";
-  if (colSelect) colSelect.innerHTML = "";
 
   if (!configs.length) {
     clearConfigEditor({ silent: true });
@@ -2925,7 +3073,6 @@ async function loadConfigs() {
     option.textContent = "No hay configuraciones";
     select.appendChild(option);
     inspectSelect.appendChild(option.cloneNode(true));
-    if (colSelect) colSelect.appendChild(option.cloneNode(true));
     return;
   }
 
@@ -2950,12 +3097,6 @@ async function loadConfigs() {
     inspectOption.textContent = cfg.name;
     inspectSelect.appendChild(inspectOption);
 
-    if (colSelect) {
-      const colOption = document.createElement("option");
-      colOption.value = cfgId;
-      colOption.textContent = cfg.name;
-      colSelect.appendChild(colOption);
-    }
   });
 
   const preferredId =
@@ -2964,9 +3105,6 @@ async function loadConfigs() {
       : getConfigIdFromObject(configs[0]);
   select.value = preferredId;
   selectInspectOptionByConfigId(preferredId);
-  if (colSelect) {
-    colSelect.value = preferredId;
-  }
 
   // Si hay una configuración selecciónada en el desplegable, reflejarla en el editor
   // para que el preview siempre muestre variables reales y no un estado vacío.
@@ -4002,7 +4140,7 @@ const colState = {
 };
 
 async function loadColConfigs() {
-  const sel = el("colConfigSelect");
+  const sel = el("colAssessSelect");
   if (!sel) return;
 
   if (!hasSession() || !state.selectedBuId) {
@@ -4010,24 +4148,26 @@ async function loadColConfigs() {
     return;
   }
 
-  let configs = Object.values(state.configsById || {});
-  if (!configs.length) {
-    configs = await api("/prompt-configs/");
-  }
-
+  const assessments = (state.assessments || []).filter((a) => a.is_active);
   sel.innerHTML = "";
-  if (!configs.length) {
+
+  if (!assessments.length) {
     const opt = document.createElement("option");
     opt.value = "";
-    opt.textContent = "No hay configuraciones";
+    opt.textContent = "No hay evaluaciones activas";
     sel.appendChild(opt);
     return;
   }
 
-  configs.forEach((c) => {
+  const empty = document.createElement("option");
+  empty.value = "";
+  empty.textContent = "Selecciona evaluación...";
+  sel.appendChild(empty);
+
+  assessments.forEach((a) => {
     const opt = document.createElement("option");
-    opt.value = c.id;
-    opt.textContent = c.name;
+    opt.value = a.id;
+    opt.textContent = a.name;
     sel.appendChild(opt);
   });
 }
@@ -4098,30 +4238,14 @@ async function processCollection() {
     setMessage("colMessage", "Añade al menos un archivo", "error");
     return;
   }
-  const configId = el("colConfigSelect").value;
-  if (!configId) {
-    setMessage("colMessage", "Seleccióna una configuración", "error");
+  const assessId = el("colAssessSelect").value;
+  if (!assessId) {
+    setMessage("colMessage", "Seleccióna una evaluación", "error");
     return;
   }
-  const rawName = el("colName").value.trim();
-  const colName = rawName || `Coleccion_${new Date().toISOString().slice(0, 10)}`;
 
   el("colProcessBtn").disabled = true;
   el("colSummary").style.display = "none";
-  setMessage("colMessage", "Creando colección...", "loading");
-
-  try {
-    const col = await api("/collections/", {
-      method: "POST",
-      body: JSON.stringify({ name: colName, config_id: configId }),
-    });
-    colState.collectionId = col.id;
-  } catch (err) {
-    setMessage("colMessage", `Error creando colección: ${err.message}`, "error");
-    el("colProcessBtn").disabled = false;
-    return;
-  }
-
   setMessage("colMessage", `Procesando 0 / ${colState.files.length}...`, "loading");
   renderColQueue();
 
@@ -4142,17 +4266,25 @@ async function processCollection() {
 
     updateColRow(item.id, { status: "procesando" });
     try {
-      const result = await api("/extract/", {
+      const pending = await api(`/assessments/${assessId}/run`, {
         method: "POST",
-        body: JSON.stringify({
-          config_id: configId,
-          document_text: docText,
-          document_name: docName,
-          collection_id: colState.collectionId,
-        }),
+        body: JSON.stringify({ document_text: docText, document_name: docName }),
       });
-      const fieldCount = Array.isArray(result.result) ? result.result.length : 0;
-      updateColRow(item.id, { status: "ok", fields: fieldCount });
+
+      // Esperar resultado (max 2 min)
+      let run = pending;
+      for (let i = 0; i < 60; i++) {
+        await new Promise((r) => setTimeout(r, 2000));
+        try { run = await api(`/assessments/runs/${pending.id}`); } catch (_) { continue; }
+        if (run.status === "success" || run.status === "failed") break;
+      }
+
+      if (run.status === "success") {
+        const fieldCount = (run.combined_result || []).reduce((acc, s) => acc + (s.result?.length || 0), 0);
+        updateColRow(item.id, { status: "ok", fields: fieldCount });
+      } else {
+        updateColRow(item.id, { status: "error", error: run.error_message || "fallido" });
+      }
     } catch (err) {
       updateColRow(item.id, { status: "error", error: err.message });
     }
@@ -4163,10 +4295,9 @@ async function processCollection() {
   const ok = colState.files.filter((f) => f.status === "ok").length;
   const fail = colState.files.filter((f) => f.status === "error").length;
   setMessage("colMessage", `Completado: ${ok} OK, ${fail} errores`, ok && !fail ? "success" : "error");
-  el("colSummaryText").textContent = `${ok} extracción(es) correctas · ${fail} error(es)`;
+  el("colSummaryText").textContent = `${ok} evaluación(es) correctas · ${fail} error(es)`;
   el("colSummary").style.display = "flex";
   el("colProcessBtn").disabled = false;
-  await loadColHistory();
 }
 
 async function loadColHistory() {
@@ -4262,11 +4393,16 @@ function wireNavigation() {
       if (btn.dataset.view === "documents") {
         loadDocuments();
       }
+      if (btn.dataset.view === "collections") {
+        loadColConfigs();
+        loadColHistory();
+      }
       if (btn.dataset.view === "assessments") {
         loadAssessments();
         populateAssessConfigSelect();
         populateAssessDocSelect();
       }
+      if (btn.dataset.view === "dashboard") loadDashboard();
     });
   });
 
@@ -4280,6 +4416,7 @@ function wireNavigation() {
     if (view === "review") loadReviewQueue();
     if (view === "users") { if (canManageUsers()) loadUsersAdminData(); loadNotifyPreference(); }
     if (view === "documents") loadDocuments();
+    if (view === "collections") { loadColConfigs(); loadColHistory(); }
     if (view === "assessments") { loadAssessments(); populateAssessConfigSelect(); populateAssessDocSelect(); }
     if (view === "doc-detail" && docId) loadDocumentDetail(docId);
     if (view === "run-detail" && docId && runId) loadRunDetail(docId, runId);
@@ -4294,6 +4431,8 @@ function wireActions() {
     }
   };
 
+  on("dashPrevMonth", "click", () => _dashShiftMonth(-1));
+  on("dashNextMonth", "click", () => _dashShiftMonth(1));
   on("loginForm", "submit", login);
   on("forgotPasswordLink", "click", () => showAuthPanel("forgotPasswordForm"));
   on("backToLoginBtn", "click", () => showAuthPanel("loginForm"));
@@ -4309,22 +4448,25 @@ function wireActions() {
     state.docsItems = [];
     state.docsTotal = 0;
     state.docsOffset = 0;
+
+    // Siempre volver a /docs al cambiar de BU
+    activateView("documents", "replace");
+
     await loadConfigs();
-    await loadColConfigs();
     await loadHistory();
-    if (canManageUsers()) {
-      await loadUsersAdminData();
-    }
+    await loadAssessments();
+    await loadColConfigs();
+    populateAssessConfigSelect();
+    populateAssessDocSelect();
+    populateCopyToBuSelect();
+
+    if (canManageUsers()) await loadUsersAdminData();
     if (canManageApiKeys()) {
       const activeApiKeys = document.querySelector(".nav-btn.active[data-view='apikeys']");
       if (activeApiKeys) await loadApiKeys();
     }
-    const docsView = document.querySelector(".nav-btn.active[data-view='documents']");
-    if (docsView) loadDocuments();
-    await loadAssessments();
-    populateAssessConfigSelect();
-    populateAssessDocSelect();
-    populateCopyToBuSelect();
+
+    loadDocuments();
   });
   on("refreshInspectConfigsBtn", "click", loadConfigs);
   on("configInspectSelect", "change", () => {
@@ -4525,14 +4667,15 @@ async function bootstrap() {
       return;
     }
     await loadConfigs();
-    await loadColConfigs();
     await loadHistory();
     await loadAssessments();
+    await loadColConfigs();
     populateAssessConfigSelect();
-    const { view: iv, docId: iDocId, runId: iRunId } = initialParsed;
-    if (iv === "documents") loadDocuments();
-    else if (iv === "doc-detail" && iDocId) loadDocumentDetail(iDocId);
-    else if (iv === "run-detail" && iDocId && iRunId) loadRunDetail(iDocId, iRunId);
+    const { docId: iDocId, runId: iRunId } = initialParsed;
+    const activeView = document.querySelector(".view.active")?.id?.replace("view-", "");
+    if (activeView === "documents") loadDocuments();
+    else if (activeView === "doc-detail" && iDocId) loadDocumentDetail(iDocId);
+    else if (activeView === "run-detail" && iDocId && iRunId) loadRunDetail(iDocId, iRunId);
   } finally {
     document.body.classList.remove("auth-loading");
   }

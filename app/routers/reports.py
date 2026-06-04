@@ -24,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.connection import get_db
 from sqlalchemy import func, and_
 from app.db.models import BUPlan, BusinessUnit, Plan, User, UsageEvent, Extraction, AssessmentRun
+from app.services.usage_service import TOKENS_CONSUMED
 from app.dependencies.auth import (
     AuthContext,
     get_bu_auth_context,
@@ -249,70 +250,135 @@ async def assign_plan_to_bu(
 # ── Dashboard de la BU ────────────────────────────────────────────────────────
 
 from datetime import date, timedelta, timezone, datetime as _dt
+import calendar as _cal
+
+
+def _parse_month(month_str: str | None, now: _dt) -> tuple[_dt, _dt]:
+    """Devuelve (month_start, month_end) en UTC para el mes indicado (YYYY-MM) o el actual."""
+    if month_str:
+        try:
+            year, mon = int(month_str[:4]), int(month_str[5:7])
+        except (ValueError, IndexError):
+            year, mon = now.year, now.month
+    else:
+        year, mon = now.year, now.month
+    month_start = _dt(year, mon, 1, tzinfo=timezone.utc)
+    last_day = _cal.monthrange(year, mon)[1]
+    month_end = _dt(year, mon, last_day, 23, 59, 59, 999999, tzinfo=timezone.utc)
+    return month_start, month_end
 
 
 @router.get("/reports/dashboard", summary="Dashboard de uso de la BU")
 async def bu_dashboard(
+    month: str | None = None,
     db: AsyncSession = Depends(get_db),
     auth: AuthContext = Depends(get_bu_auth_context),
 ):
-    """Métricas resumidas + tendencia de 30 días para el dashboard de la BU."""
+    """Métricas resumidas + tendencia de 30 días para el dashboard de la BU.
+
+    Parámetro opcional `month` en formato YYYY-MM (ej. 2026-05).
+    Sin parámetro devuelve el mes en curso.
+    """
     require_bu_roles(auth, {"bu_admin", "admin_global"}, "Solo bu_admin puede ver el dashboard")
 
     now = _dt.now(timezone.utc)
-    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    month_start, month_end = _parse_month(month, now)
+    trend_start = month_start - timedelta(days=29)  # 30 días hasta fin del mes
 
-    # Totales del mes
-    usage_res = await db.execute(
-        select(UsageEvent.event_type, func.sum(UsageEvent.quantity).label("total"))
-        .where(UsageEvent.bu_id == auth.bu_id, UsageEvent.created_at >= month_start)
-        .group_by(UsageEvent.event_type)
-    )
-    totals = {row.event_type: int(row.total) for row in usage_res}
-
-    # Extracciones pendientes de revisión
-    review_res = await db.execute(
+    # Ejecuciones del mes
+    runs_res = await db.execute(
         select(func.count()).where(
-            Extraction.bu_id == auth.bu_id,
-            Extraction.status == "pending_review",
+            AssessmentRun.bu_id == auth.bu_id,
+            AssessmentRun.created_at >= month_start,
+            AssessmentRun.created_at <= month_end,
         )
     )
-    pending_review = review_res.scalar() or 0
+    runs_this_month = runs_res.scalar() or 0
 
-    # Tasa de éxito extracciones (último mes)
-    ext_res = await db.execute(
-        select(Extraction.status, func.count().label("n"))
-        .where(Extraction.bu_id == auth.bu_id, Extraction.created_at >= month_start)
-        .group_by(Extraction.status)
+    # Documentos distintos evaluados este mes
+    docs_res = await db.execute(
+        select(func.count(AssessmentRun.document_id.distinct())).where(
+            AssessmentRun.bu_id == auth.bu_id,
+            AssessmentRun.created_at >= month_start,
+            AssessmentRun.created_at <= month_end,
+            AssessmentRun.document_id.isnot(None),
+        )
     )
-    ext_by_status = {row.status: row.n for row in ext_res}
-    total_ext = sum(ext_by_status.values()) or 1
-    success_rate = round((ext_by_status.get("success", 0) + ext_by_status.get("validated", 0)) / total_ext * 100, 1)
+    documents_this_month = docs_res.scalar() or 0
 
-    # Tendencia diaria últimos 30 días (extracciones)
-    thirty_days_ago = now - timedelta(days=30)
+    # Tasa de éxito
+    status_res = await db.execute(
+        select(AssessmentRun.status, func.count().label("n"))
+        .where(
+            AssessmentRun.bu_id == auth.bu_id,
+            AssessmentRun.created_at >= month_start,
+            AssessmentRun.created_at <= month_end,
+        )
+        .group_by(AssessmentRun.status)
+    )
+    by_status = {row.status: row.n for row in status_res}
+    total_runs = sum(by_status.values()) or 1
+    success_rate = round(by_status.get("success", 0) / total_runs * 100, 1)
+
+    # Latencia media de ejecuciones exitosas
+    lat_res = await db.execute(
+        select(func.avg(AssessmentRun.latency_ms)).where(
+            AssessmentRun.bu_id == auth.bu_id,
+            AssessmentRun.created_at >= month_start,
+            AssessmentRun.created_at <= month_end,
+            AssessmentRun.status == "success",
+            AssessmentRun.latency_ms.isnot(None),
+        )
+    )
+    avg_latency_ms = round(lat_res.scalar() or 0)
+
+    # Tokens consumidos y coste estimado
+    tokens_res = await db.execute(
+        select(func.coalesce(func.sum(UsageEvent.quantity), 0)).where(
+            UsageEvent.bu_id == auth.bu_id,
+            UsageEvent.event_type == TOKENS_CONSUMED,
+            UsageEvent.created_at >= month_start,
+            UsageEvent.created_at <= month_end,
+        )
+    )
+    tokens_this_month = int(tokens_res.scalar() or 0)
+    estimated_cost_eur = round(tokens_this_month / 1_000_000 * 5.0, 4)
+
+    # Tendencia diaria (30 días hasta fin del mes seleccionado)
     daily_res = await db.execute(
         select(
-            func.date_trunc("day", Extraction.created_at).label("day"),
+            func.date_trunc("day", AssessmentRun.created_at).label("day"),
             func.count().label("n"),
         )
-        .where(Extraction.bu_id == auth.bu_id, Extraction.created_at >= thirty_days_ago)
+        .where(
+            AssessmentRun.bu_id == auth.bu_id,
+            AssessmentRun.created_at >= trend_start,
+            AssessmentRun.created_at <= month_end,
+        )
         .group_by("day")
         .order_by("day")
     )
-    daily = [{"date": str(row.day.date()), "extractions": row.n} for row in daily_res]
+    daily = [{"date": str(row.day.date()), "runs": row.n} for row in daily_res]
 
-    # Coste estimado (tokens × precio aproximado gpt-4o)
-    tokens_this_month = totals.get("tokens.consumed", 0)
-    estimated_cost_eur = round(tokens_this_month / 1_000_000 * 5.0, 4)  # ~5€/M tokens
+    # Meses navegables (primero con datos hasta hoy)
+    first_run_res = await db.execute(
+        select(func.min(AssessmentRun.created_at)).where(
+            AssessmentRun.bu_id == auth.bu_id,
+        )
+    )
+    first_run = first_run_res.scalar()
+    earliest = first_run.strftime("%Y-%m") if first_run else month_start.strftime("%Y-%m")
 
     return {
         "month": month_start.strftime("%B %Y"),
-        "extractions_this_month": totals.get("extraction.run", 0),
-        "documents_this_month": totals.get("doc.uploaded", 0),
+        "month_key": month_start.strftime("%Y-%m"),
+        "earliest_month": earliest,
+        "current_month": now.strftime("%Y-%m"),
+        "runs_this_month": runs_this_month,
+        "documents_this_month": documents_this_month,
+        "success_rate_pct": success_rate,
+        "avg_latency_ms": avg_latency_ms,
         "tokens_this_month": tokens_this_month,
         "estimated_cost_eur": estimated_cost_eur,
-        "success_rate_pct": success_rate,
-        "pending_review": pending_review,
         "daily_trend": daily,
     }

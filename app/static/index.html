@@ -247,8 +247,8 @@
           <div style="display:flex;gap:0.5rem;align-items:center">
             <div id="batchBar" class="batch-bar" style="display:none">
               <span id="batchCount">0 seleccionados</span>
-              <select id="batchConfigSelect" style="font-size:0.8rem;padding:0.25rem 0.5rem">
-                <option value="">Config…</option>
+              <select id="batchAssessSelect" style="font-size:0.8rem;padding:0.25rem 0.5rem">
+                <option value="">Evaluación…</option>
               </select>
               <button id="batchRunBtn" class="secondary" type="button" style="font-size:0.8rem;padding:0.3rem 0.8rem">Ejecutar en lote</button>
               <button id="batchCancelBtn" class="secondary" type="button" style="font-size:0.8rem;padding:0.3rem 0.6rem">✕</button>
@@ -449,8 +449,8 @@
 
         <div class="collections-setup grid-2">
           <label>
-            Configuración
-            <select id="colConfigSelect"></select>
+            Evaluación
+            <select id="colAssessSelect"></select>
           </label>
           <label>
             Nombre de la colección
@@ -906,18 +906,25 @@ Content-Type: application/json
 
       <!-- ══════════════ DASHBOARD ══════════════ -->
       <section id="view-dashboard" class="card view">
-        <h2>Dashboard</h2>
-        <div id="dashboardStats" class="dashboard-stats">
-          <div class="stat-card"><div class="stat-value" id="dashExtractions">—</div><div class="stat-label">Extracciones este mes</div></div>
-          <div class="stat-card"><div class="stat-value" id="dashDocuments">—</div><div class="stat-label">Documentos subidos</div></div>
-          <div class="stat-card"><div class="stat-value" id="dashTokens">—</div><div class="stat-label">Tokens consumidos</div></div>
-          <div class="stat-card"><div class="stat-value" id="dashCost">—</div><div class="stat-label">Coste estimado (€)</div></div>
-          <div class="stat-card"><div class="stat-value" id="dashSuccessRate">—</div><div class="stat-label">Tasa de éxito</div></div>
-          <div class="stat-card stat-card--alert"><div class="stat-value" id="dashPendingReview">—</div><div class="stat-label">Pendientes de revisión</div></div>
+        <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:1.25rem;flex-wrap:wrap">
+          <h2 style="margin:0">Dashboard</h2>
+          <div style="display:flex;align-items:center;gap:0.4rem;margin-left:auto">
+            <button id="dashPrevMonth" class="secondary icon-btn" title="Mes anterior" style="padding:0.2rem 0.5rem">&#8249;</button>
+            <span id="dashPeriod" style="font-size:0.9rem;font-weight:600;min-width:9rem;text-align:center"></span>
+            <button id="dashNextMonth" class="secondary icon-btn" title="Mes siguiente" style="padding:0.2rem 0.5rem">&#8250;</button>
+          </div>
         </div>
-        <h3>Extracciones diarias — últimos 30 días</h3>
+        <div id="dashboardStats" class="dashboard-stats">
+          <div class="stat-card"><div class="stat-value" id="dashRuns">—</div><div class="stat-label">Ejecuciones</div></div>
+          <div class="stat-card"><div class="stat-value" id="dashDocuments">—</div><div class="stat-label">Documentos evaluados</div></div>
+          <div class="stat-card"><div class="stat-value" id="dashSuccessRate">—</div><div class="stat-label">Tasa de éxito</div></div>
+          <div class="stat-card"><div class="stat-value" id="dashLatency">—</div><div class="stat-label">Latencia media</div></div>
+          <div class="stat-card"><div class="stat-value" id="dashTokens">—</div><div class="stat-label">Tokens consumidos</div></div>
+          <div class="stat-card"><div class="stat-value" id="dashCost" style="font-size:1.4rem">—</div><div class="stat-label">Coste estimado</div></div>
+        </div>
+        <p style="font-size:0.8rem;color:var(--text-3);margin:0 0 0.75rem">Ejecuciones diarias — últimos 30 días</p>
         <div id="dashChart" class="dash-chart-wrap">
-          <canvas id="dashChartCanvas" height="120"></canvas>
+          <canvas id="dashChartCanvas" height="180"></canvas>
         </div>
       </section>
 
@@ -953,6 +960,6 @@ Content-Type: application/json
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" crossorigin="anonymous"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" crossorigin="anonymous"></script>
-  <script src="/static/app.js?v=20260530a"></script>
+  <script src="/static/app.js?v=20260604c"></script>
 </body>
 </html>
