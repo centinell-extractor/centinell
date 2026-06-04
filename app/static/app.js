@@ -1634,40 +1634,293 @@ function renderAssessmentList() {
   state.assessments.forEach((a) => {
     const card = document.createElement("div");
     card.className = "assess-card";
+    card.setAttribute("role", "button");
+    card.setAttribute("tabindex", "0");
+    card.setAttribute("aria-label", `Abrir evaluación ${a.name}`);
 
     const configTags = (a.configs || [])
-      .map((c) => `<span class="assess-config-tag">${c.config_name}</span>`)
+      .map((c) => `<span class="assess-config-tag">${escapeHtml(c.config_name)}</span>`)
       .join("");
 
     card.innerHTML = `
       <div class="assess-card-header">
-        <span class="assess-card-name">${a.name}</span>
+        <span class="assess-card-name">${escapeHtml(a.name)}</span>
         <div class="assess-card-actions">
-          <button type="button" class="secondary" data-assess-run="${a.id}">Ejecutar</button>
-          ${canManagePromptConfigs() ? `<button type="button" class="secondary icon-btn" data-assess-edit="${a.id}" title="Editar">
+          ${canManagePromptConfigs() ? `
+          <button type="button" class="secondary icon-btn" data-assess-edit="${a.id}" title="Editar">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17.25V21h3.75L18.81 8.94l-3.75-3.75L3 17.25zm17.71-10.04a1 1 0 0 0 0-1.41l-2.5-2.5a1 1 0 0 0-1.41 0L14.96 5.1l3.75 3.75 1.99-1.64z"/></svg>
           </button>
           <button type="button" class="danger icon-btn" data-assess-delete="${a.id}" title="Eliminar">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6l1 2h4v2H4V5h4l1-2zm1 6h2v9h-2V9zm4 0h2v9h-2V9zM7 9h2v9H7V9zm1 12h8a2 2 0 0 0 2-2V9H6v10a2 2 0 0 0 2 2z"/></svg>
           </button>` : ""}
+          <svg class="assess-card-chevron" viewBox="0 0 24 24" aria-hidden="true" style="width:16px;height:16px;color:var(--text-3);flex-shrink:0"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
         </div>
       </div>
-      ${a.description ? `<p class="assess-card-desc">${a.description}</p>` : ""}
+      ${a.description ? `<p class="assess-card-desc">${escapeHtml(a.description)}</p>` : ""}
       <div class="assess-card-configs">${configTags || '<span style="font-size:.75rem;color:var(--text-3)">Sin configuraciones</span>'}</div>
     `;
 
-    card.querySelector(`[data-assess-run="${a.id}"]`)?.addEventListener("click", () => {
-      selectAssessmentForRun(a.id);
+    const navigate = () => {
+      activateView("assessment-detail", "push", { assessId: a.id });
+      loadAssessmentDetail(a.id);
+    };
+
+    card.addEventListener("click", (e) => {
+      if (e.target.closest("[data-assess-edit], [data-assess-delete]")) return;
+      navigate();
+    });
+    card.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate(); }
     });
 
     if (canManagePromptConfigs()) {
-      card.querySelector(`[data-assess-edit="${a.id}"]`)?.addEventListener("click", () => editAssessment(a.id));
-      card.querySelector(`[data-assess-delete="${a.id}"]`)?.addEventListener("click", () => deleteAssessment(a.id));
+      card.querySelector(`[data-assess-edit="${a.id}"]`)?.addEventListener("click", (e) => {
+        e.stopPropagation();
+        editAssessment(a.id);
+      });
+      card.querySelector(`[data-assess-delete="${a.id}"]`)?.addEventListener("click", (e) => {
+        e.stopPropagation();
+        deleteAssessment(a.id);
+      });
     }
 
     container.appendChild(card);
   });
 }
+
+// ── Assessment detail ─────────────────────────────────────────────────────
+
+async function loadAssessmentDetail(assessId) {
+  if (!hasSession() || !state.selectedBuId) return;
+
+  let assessment = (state.assessments || []).find((a) => a.id === assessId);
+  if (!assessment) {
+    try {
+      await loadAssessments();
+      assessment = (state.assessments || []).find((a) => a.id === assessId);
+    } catch (_) {}
+  }
+  if (!assessment) {
+    activateView("assessments", "replace");
+    return;
+  }
+
+  state.currentAssessId = assessId;
+
+  // Header
+  el("assessDetailName").textContent = assessment.name;
+  const descEl = el("assessDetailDesc");
+  if (descEl) {
+    descEl.textContent = assessment.description || "";
+    descEl.style.display = assessment.description ? "" : "none";
+  }
+  const configsEl = el("assessDetailConfigs");
+  if (configsEl) {
+    const tags = (assessment.configs || [])
+      .map((c) => `<span class="assess-config-tag">${escapeHtml(c.config_name)}</span>`)
+      .join("");
+    configsEl.innerHTML = tags || '<span style="font-size:.75rem;color:var(--text-3)">Sin configuraciones</span>';
+  }
+
+  const canEdit = canManagePromptConfigs();
+  if (el("assessDetailEditBtn")) el("assessDetailEditBtn").style.display = canEdit ? "" : "none";
+  if (el("assessDetailDeleteBtn")) el("assessDetailDeleteBtn").style.display = canEdit ? "" : "none";
+
+  // Populate doc selector
+  _populateDetailDocSelect();
+
+  // Reset run area
+  if (el("assessDetailRunResults")) el("assessDetailRunResults").style.display = "none";
+  setMessage("assessDetailRunMessage", "", "idle");
+  setMessage("assessDetailMessage", "", "idle");
+
+  // Load history
+  _loadAssessmentDetailHistory(assessId);
+}
+
+function _populateDetailDocSelect() {
+  const sel = el("assessDetailDocSelect");
+  if (!sel) return;
+  const processed = (state.docsItems || []).filter((d) => d.status === "processed" && d.ocr_text);
+  sel.innerHTML = '<option value="">Selecciona un documento procesado</option>';
+  processed.forEach((d) => {
+    const opt = document.createElement("option");
+    opt.value = d.id;
+    opt.textContent = d.filename || d.id;
+    sel.appendChild(opt);
+  });
+  if (!processed.length) {
+    sel.innerHTML = '<option value="">Sin documentos listos — ve a Documentos</option>';
+  }
+}
+
+async function _loadAssessmentDetailHistory(assessId) {
+  const container = el("assessDetailHistory");
+  if (!container) return;
+  container.innerHTML = '<p class="empty-row">Cargando...</p>';
+  try {
+    const runs = await api(`/assessments/${assessId}/runs?limit=30`);
+    _renderDetailHistory(runs);
+  } catch (_) {
+    container.innerHTML = '<p class="empty-row">Error cargando historial</p>';
+  }
+}
+
+function _renderDetailHistory(runs) {
+  const container = el("assessDetailHistory");
+  if (!container) return;
+  if (!runs.length) {
+    container.innerHTML = '<p class="empty-row">Sin ejecuciones todavía</p>';
+    return;
+  }
+  const rows = runs.map((r) => {
+    const lat = r.latency_ms
+      ? (r.latency_ms >= 1000 ? `${(r.latency_ms / 1000).toFixed(1)}s` : `${r.latency_ms}ms`)
+      : "—";
+    const docLink = r.document_id
+      ? `<a href="/docs/${r.document_id}" data-nav-doc="${r.document_id}" style="color:var(--brand)">${escapeHtml(r.document_name || r.document_id.slice(0, 8))}</a>`
+      : escapeHtml(r.document_name || "—");
+    const runLink = r.document_id
+      ? `<a href="/docs/${r.document_id}/runs/${r.id}" data-nav-run="${r.document_id}" data-nav-run-id="${r.id}" style="color:var(--brand);font-size:0.8rem">Ver</a>`
+      : "";
+    return `<tr>
+      <td>${docLink}</td>
+      <td><span class="status-badge status-${r.status}">${r.status}</span></td>
+      <td>${lat}</td>
+      <td style="font-size:0.78rem;color:var(--text-3)">${formatHistoryDate(r.created_at)}</td>
+      <td>${runLink}</td>
+    </tr>`;
+  }).join("");
+
+  container.innerHTML = `
+    <table>
+      <thead><tr>
+        <th>Documento</th><th>Estado</th><th>Latencia</th><th>Fecha</th><th></th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+
+  // Wire SPA navigation for links inside history
+  container.querySelectorAll("[data-nav-doc]").forEach((a) => {
+    a.addEventListener("click", (e) => {
+      e.preventDefault();
+      const docId = a.dataset.navDoc;
+      activateView("doc-detail", "push", { docId });
+      loadDocumentDetail(docId);
+    });
+  });
+  container.querySelectorAll("[data-nav-run]").forEach((a) => {
+    a.addEventListener("click", (e) => {
+      e.preventDefault();
+      const docId = a.dataset.navRun, runId = a.dataset.navRunId;
+      activateView("run-detail", "push", { docId, runId });
+      loadRunDetail(docId, runId);
+    });
+  });
+}
+
+async function runAssessmentFromDetail() {
+  const assessId = state.currentAssessId;
+  if (!assessId) return;
+
+  const docId = el("assessDetailDocSelect")?.value;
+  const doc = docId ? (state.docsItems || []).find((d) => d.id === docId) : null;
+  const documentText = doc?.ocr_text || "";
+  if (!documentText.trim()) {
+    setMessage("assessDetailRunMessage", "Selecciona un documento con texto procesado", "error");
+    return;
+  }
+
+  setMessage("assessDetailRunMessage", "Iniciando evaluación...", "loading");
+  el("assessDetailRunBtn").disabled = true;
+  if (el("assessDetailRunResults")) el("assessDetailRunResults").style.display = "none";
+
+  try {
+    const pending = await api(`/assessments/${assessId}/run`, {
+      method: "POST",
+      body: JSON.stringify({
+        document_text: documentText,
+        document_name: doc?.filename || null,
+        document_id: docId || null,
+      }),
+    });
+
+    const runId = pending.id;
+    setMessage("assessDetailRunMessage", "Procesando...", "loading");
+
+    const MAX_POLLS = 120;
+    for (let i = 0; i < MAX_POLLS; i++) {
+      await new Promise((r) => setTimeout(r, 1500));
+      let run;
+      try { run = await api(`/assessments/runs/${runId}`); } catch (_) { continue; }
+
+      if (run.status === "success") {
+        _renderDetailRunResults(run);
+        const lat = run.latency_ms ? ` en ${(run.latency_ms / 1000).toFixed(1)}s` : "";
+        setMessage("assessDetailRunMessage", `Evaluación completada${lat}`, "success");
+        _loadAssessmentDetailHistory(assessId);
+        return;
+      }
+      if (run.status === "failed") {
+        setMessage("assessDetailRunMessage", `Error: ${run.error_message || "desconocido"}`, "error");
+        return;
+      }
+    }
+    setMessage("assessDetailRunMessage", "La evaluación está tardando demasiado. Inténtalo de nuevo.", "error");
+  } catch (err) {
+    setMessage("assessDetailRunMessage", `Error: ${err.message}`, "error");
+  } finally {
+    el("assessDetailRunBtn").disabled = false;
+  }
+}
+
+function _renderDetailRunResults(run) {
+  const resultsEl = el("assessDetailRunResults");
+  const sectionsEl = el("assessDetailRunSections");
+  if (!resultsEl || !sectionsEl) return;
+
+  el("assessDetailRunTitle").textContent = run.assessment_name || "Resultado";
+  const lat = run.latency_ms ? `${(run.latency_ms / 1000).toFixed(1)}s` : "";
+  el("assessDetailRunMeta").textContent = [run.document_name, lat].filter(Boolean).join(" · ");
+
+  sectionsEl.innerHTML = "";
+  (Array.isArray(run.combined_result) ? run.combined_result : []).forEach((section) => {
+    const div = document.createElement("div");
+    div.className = "assess-section";
+    const secLat = section.latency_ms ? `${(section.latency_ms / 1000).toFixed(1)}s` : "";
+    div.innerHTML = `
+      <div class="assess-section-header">
+        <span class="assess-section-name">${escapeHtml(section.config_name)}</span>
+        <span class="assess-section-meta">${secLat}</span>
+      </div>`;
+    if (section.error) {
+      const e = document.createElement("div");
+      e.className = "assess-section-error";
+      e.textContent = `Error: ${section.error}`;
+      div.appendChild(e);
+    } else {
+      const items = Array.isArray(section.result) ? section.result : [];
+      if (items.length) {
+        const table = document.createElement("table");
+        table.innerHTML = `<thead><tr><th>Campo</th><th>Valor</th></tr></thead>`;
+        const tbody = document.createElement("tbody");
+        items.forEach((item) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `<td>${escapeHtml(item.title || "-")}</td><td>${item.answer ?? "-"}</td>`;
+          tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+        div.appendChild(table);
+      } else {
+        div.innerHTML += '<div class="assess-section-error" style="color:var(--text-3)">Sin resultados</div>';
+      }
+    }
+    sectionsEl.appendChild(div);
+  });
+  resultsEl.style.display = "";
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 function renderAssessConfigDraft() {
   const list = el("assessConfigList");
@@ -2865,9 +3118,13 @@ async function deleteDocument(docId) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 // Sub-views that keep the parent nav button highlighted
-const VIEW_PARENT = { "doc-detail": "documents", "run-detail": "documents" };
+const VIEW_PARENT = {
+  "doc-detail": "documents",
+  "run-detail": "documents",
+  "assessment-detail": "assessments",
+};
 
-// Parse current URL into {view, docId?, runId?}
+// Parse current URL into {view, docId?, runId?, assessId?}
 function parseCurrentPath() {
   const p = location.pathname;
   let m;
@@ -2875,6 +3132,8 @@ function parseCurrentPath() {
   if (m) return { view: "run-detail", docId: m[1], runId: m[2] };
   m = p.match(/^\/docs\/([^/]+)$/);
   if (m) return { view: "doc-detail", docId: m[1] };
+  m = p.match(/^\/evals\/([^/]+)$/);
+  if (m) return { view: "assessment-detail", assessId: m[1] };
   return { view: PATH_TO_VIEW[p] ?? "run" };
 }
 
@@ -2882,7 +3141,7 @@ function parseCurrentPath() {
 function activateView(view, historyMode = "push", params = {}) {
   // Guard: si el usuario no puede ejecutar extracciones y navega a una vista
   // restringida (por URL directa o pushState), redirigir a Documentos.
-  if (hasSession() && !canRunExtractions() && ["run", "assessments", "history"].includes(view)) {
+  if (hasSession() && !canRunExtractions() && ["run", "assessments", "assessment-detail", "history"].includes(view)) {
     view = "documents";
     historyMode = "replace";
     params = {};
@@ -2901,6 +3160,7 @@ function activateView(view, historyMode = "push", params = {}) {
     let path;
     if (view === "doc-detail" && params.docId) path = `/docs/${params.docId}`;
     else if (view === "run-detail" && params.docId && params.runId) path = `/docs/${params.docId}/runs/${params.runId}`;
+    else if (view === "assessment-detail" && params.assessId) path = `/evals/${params.assessId}`;
     else path = VIEW_PATHS[view] ?? `/${view}`;
     if (historyMode === "push") history.pushState({ view, ...params }, "", path);
     else history.replaceState({ view, ...params }, "", path);
@@ -4387,28 +4647,17 @@ function wireNavigation() {
     btn.addEventListener("click", () => {
       activateView(btn.dataset.view, "push");
       if (btn.dataset.view === "apikeys" && canManageApiKeys()) { loadApiKeys(); }
-      if (btn.dataset.view === "users" && canManageUsers()) {
-        loadUsersAdminData();
-      }
-      if (btn.dataset.view === "documents") {
-        loadDocuments();
-      }
-      if (btn.dataset.view === "collections") {
-        loadColConfigs();
-        loadColHistory();
-      }
-      if (btn.dataset.view === "assessments") {
-        loadAssessments();
-        populateAssessConfigSelect();
-        populateAssessDocSelect();
-      }
+      if (btn.dataset.view === "users" && canManageUsers()) { loadUsersAdminData(); }
+      if (btn.dataset.view === "documents") { loadDocuments(); }
+      if (btn.dataset.view === "collections") { loadColConfigs(); loadColHistory(); }
+      if (btn.dataset.view === "assessments") { loadAssessments(); populateAssessConfigSelect(); }
       if (btn.dataset.view === "dashboard") loadDashboard();
     });
   });
 
   window.addEventListener("popstate", (event) => {
     const parsed = event.state?.view ? event.state : parseCurrentPath();
-    const { view, docId, runId } = parsed;
+    const { view, docId, runId, assessId } = parsed;
     activateView(view, "none", parsed);
     if (view === "apikeys" && canManageApiKeys()) loadApiKeys();
     if (view === "webhooks") loadWebhooks();
@@ -4417,7 +4666,8 @@ function wireNavigation() {
     if (view === "users") { if (canManageUsers()) loadUsersAdminData(); loadNotifyPreference(); }
     if (view === "documents") loadDocuments();
     if (view === "collections") { loadColConfigs(); loadColHistory(); }
-    if (view === "assessments") { loadAssessments(); populateAssessConfigSelect(); populateAssessDocSelect(); }
+    if (view === "assessments") { loadAssessments(); populateAssessConfigSelect(); }
+    if (view === "assessment-detail" && assessId) loadAssessmentDetail(assessId);
     if (view === "doc-detail" && docId) loadDocumentDetail(docId);
     if (view === "run-detail" && docId && runId) loadRunDetail(docId, runId);
   });
@@ -4433,6 +4683,27 @@ function wireActions() {
 
   on("dashPrevMonth", "click", () => _dashShiftMonth(-1));
   on("dashNextMonth", "click", () => _dashShiftMonth(1));
+  on("assessDetailBackBtn", "click", () => {
+    activateView("assessments", "push");
+    loadAssessments();
+    populateAssessConfigSelect();
+  });
+  on("assessDetailRunBtn", "click", runAssessmentFromDetail);
+  on("assessDetailEditBtn", "click", () => {
+    const id = state.currentAssessId;
+    if (!id) return;
+    activateView("assessments", "push");
+    loadAssessments().then(() => editAssessment(id));
+    populateAssessConfigSelect();
+  });
+  on("assessDetailDeleteBtn", "click", () => {
+    const id = state.currentAssessId;
+    if (!id) return;
+    deleteAssessment(id).then(() => {
+      activateView("assessments", "replace");
+      loadAssessments();
+    });
+  });
   on("loginForm", "submit", login);
   on("forgotPasswordLink", "click", () => showAuthPanel("forgotPasswordForm"));
   on("backToLoginBtn", "click", () => showAuthPanel("loginForm"));
@@ -4451,6 +4722,8 @@ function wireActions() {
 
     // Siempre volver a /docs al cambiar de BU
     activateView("documents", "replace");
+
+    state.currentAssessId = null;
 
     await loadConfigs();
     await loadHistory();
@@ -4671,11 +4944,12 @@ async function bootstrap() {
     await loadAssessments();
     await loadColConfigs();
     populateAssessConfigSelect();
-    const { docId: iDocId, runId: iRunId } = initialParsed;
+    const { docId: iDocId, runId: iRunId, assessId: iAssessId } = initialParsed;
     const activeView = document.querySelector(".view.active")?.id?.replace("view-", "");
     if (activeView === "documents") loadDocuments();
     else if (activeView === "doc-detail" && iDocId) loadDocumentDetail(iDocId);
     else if (activeView === "run-detail" && iDocId && iRunId) loadRunDetail(iDocId, iRunId);
+    else if (activeView === "assessment-detail" && iAssessId) loadAssessmentDetail(iAssessId);
   } finally {
     document.body.classList.remove("auth-loading");
   }

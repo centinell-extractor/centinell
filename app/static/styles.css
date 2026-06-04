@@ -1510,7 +1510,28 @@ tbody tr:hover { background: #f8f9fd; }
 
 .assess-layout {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(300px, 420px) 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+/* Detail view */
+.assess-detail-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.assess-detail-header-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.assess-detail-layout {
+  display: grid;
+  grid-template-columns: 55% 1fr;
   gap: 24px;
   align-items: start;
 }
@@ -1615,7 +1636,8 @@ tbody tr:hover { background: #f8f9fd; }
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 
-.assess-card:hover { border-color: var(--border-2); box-shadow: var(--shadow-xs); }
+.assess-card { cursor: pointer; }
+.assess-card:hover { border-color: var(--brand); box-shadow: var(--shadow-xs); }
 
 .assess-card-header {
   display: flex;
@@ -1778,6 +1800,7 @@ tbody tr:hover { background: #f8f9fd; }
 @media (max-width: 900px) {
   /* Assessments: de 2 cols a 1 */
   .assess-layout { grid-template-columns: 1fr; }
+  .assess-detail-layout { grid-template-columns: 1fr; }
 
   /* Run y doc detail: apilan en tablet */
   .run-detail-layout:not(.preview-collapsed) { grid-template-columns: 1fr; }

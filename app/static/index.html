@@ -367,78 +367,99 @@
 
       <!-- ══════════════ EVALUACIONES ══════════════ -->
       <section id="view-assessments" class="card view">
+        <h2>Evaluaciones</h2>
+
         <div class="assess-layout">
-
-          <!-- LEFT: manage -->
-          <div class="assess-manage">
-            <h2>Evaluaciones</h2>
-
-            <div class="assess-form card-inner">
-              <h3 id="assessFormTitle">Nueva evaluación</h3>
-              <label>
-                Nombre
-                <input id="assessName" type="text" placeholder="Ej: Análisis de factura">
-              </label>
-              <label>
-                Descripción <span class="field-hint">(opcional)</span>
-                <textarea id="assessDescription" rows="2" placeholder="Qué extrae esta evaluación..."></textarea>
-              </label>
-              <div class="assess-configs-picker">
-                <label for="assessConfigSelect">Agregar configuración</label>
-                <div class="assess-config-add-row">
-                  <select id="assessConfigSelect"></select>
-                  <button id="assessAddConfigBtn" type="button" class="secondary">+ Agregar</button>
-                </div>
-                <ul id="assessConfigList" class="assess-config-list">
-                  <li class="assess-config-empty">Agrega al menos una configuración</li>
-                </ul>
+          <!-- LEFT: form -->
+          <div class="assess-form card-inner">
+            <h3 id="assessFormTitle">Nueva evaluación</h3>
+            <label>
+              Nombre
+              <input id="assessName" type="text" placeholder="Ej: Análisis de factura">
+            </label>
+            <label>
+              Descripción <span class="field-hint">(opcional)</span>
+              <textarea id="assessDescription" rows="2" placeholder="Qué extrae esta evaluación..."></textarea>
+            </label>
+            <div class="assess-configs-picker">
+              <label for="assessConfigSelect">Agregar configuración</label>
+              <div class="assess-config-add-row">
+                <select id="assessConfigSelect"></select>
+                <button id="assessAddConfigBtn" type="button" class="secondary">+ Agregar</button>
               </div>
-              <div class="actions">
-                <button id="assessSaveBtn" type="button">Guardar</button>
-                <button id="assessCancelBtn" type="button" class="secondary" style="display:none">Cancelar edición</button>
-              </div>
-              <div id="assessFormMessage" class="message" role="status" aria-live="polite"></div>
+              <ul id="assessConfigList" class="assess-config-list">
+                <li class="assess-config-empty">Agrega al menos una configuración</li>
+              </ul>
             </div>
+            <div class="actions">
+              <button id="assessSaveBtn" type="button">Guardar</button>
+              <button id="assessCancelBtn" type="button" class="secondary" style="display:none">Cancelar edición</button>
+            </div>
+            <div id="assessFormMessage" class="message" role="status" aria-live="polite"></div>
+          </div>
 
+          <!-- RIGHT: list -->
+          <div>
             <h3 class="assess-list-title">Mis evaluaciones</h3>
             <div id="assessMessage" class="message" role="status" aria-live="polite"></div>
             <div id="assessList" class="assess-list">
               <p class="empty-row">Cargando...</p>
             </div>
           </div>
+        </div>
+      </section>
 
-          <!-- RIGHT: run -->
-          <div class="assess-run">
-            <h2>Ejecutar</h2>
+      <!-- ══════════════ DETALLE DE EVALUACIÓN ══════════════ -->
+      <section id="view-assessment-detail" class="card view">
+        <!-- Header -->
+        <div class="assess-detail-header">
+          <button id="assessDetailBackBtn" class="secondary icon-btn" title="Volver a evaluaciones">
+            <svg viewBox="0 0 24 24" aria-hidden="true" style="width:18px;height:18px"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+            Evaluaciones
+          </button>
+          <div class="assess-detail-header-body">
+            <h2 id="assessDetailName" style="margin:0"></h2>
+            <p id="assessDetailDesc" class="assess-card-desc" style="margin:0.25rem 0 0"></p>
+            <div id="assessDetailConfigs" class="assess-card-configs" style="margin-top:0.5rem"></div>
+          </div>
+          <div style="display:flex;gap:0.5rem;flex-shrink:0">
+            <button id="assessDetailEditBtn" class="secondary" style="display:none">Editar</button>
+            <button id="assessDetailDeleteBtn" class="danger" style="display:none">Eliminar</button>
+          </div>
+        </div>
+        <div id="assessDetailMessage" class="message" role="status" aria-live="polite"></div>
 
+        <!-- Body: run + history -->
+        <div class="assess-detail-layout">
+          <!-- Left: run -->
+          <div>
+            <h3 style="margin-top:0">Ejecutar</h3>
             <div class="assess-run-form card-inner">
               <label>
-                Evaluación
-                <select id="assessRunSelect">
-                  <option value="">Selecciona una evaluación</option>
-                </select>
-              </label>
-              <label>
                 Documento
-                <select id="assessDocSelect">
+                <select id="assessDetailDocSelect">
                   <option value="">Selecciona un documento procesado</option>
                 </select>
               </label>
               <div class="actions">
-                <button id="assessRunBtn" type="button">Ejecutar evaluación</button>
+                <button id="assessDetailRunBtn" type="button">Ejecutar evaluación</button>
               </div>
-              <div id="assessRunMessage" class="message" role="status" aria-live="polite"></div>
+              <div id="assessDetailRunMessage" class="message" role="status" aria-live="polite"></div>
             </div>
-
-            <div id="assessRunResults" class="assess-run-results" style="display:none">
+            <div id="assessDetailRunResults" class="assess-run-results" style="display:none">
               <div class="assess-results-header">
-                <h3 id="assessRunTitle"></h3>
-                <span id="assessRunMeta" class="assess-run-meta"></span>
+                <h3 id="assessDetailRunTitle"></h3>
+                <span id="assessDetailRunMeta" class="assess-run-meta"></span>
               </div>
-              <div id="assessRunSections"></div>
+              <div id="assessDetailRunSections"></div>
             </div>
           </div>
 
+          <!-- Right: history -->
+          <div>
+            <h3 style="margin-top:0">Historial de ejecuciones</h3>
+            <div id="assessDetailHistory"><p class="empty-row">Cargando...</p></div>
+          </div>
         </div>
       </section>
 
@@ -960,6 +981,6 @@ Content-Type: application/json
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" crossorigin="anonymous"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" crossorigin="anonymous"></script>
-  <script src="/static/app.js?v=20260604c"></script>
+  <script src="/static/app.js?v=20260604d"></script>
 </body>
 </html>
