@@ -1,5 +1,5 @@
 # app/db/models.py
-from sqlalchemy import BigInteger, Column, String, Integer, Boolean, Text, JSON, TIMESTAMP, func, ForeignKey, Float, Index, UniqueConstraint
+from sqlalchemy import BigInteger, Column, String, Integer, Boolean, Text, JSON, TIMESTAMP, func, ForeignKey, Float, Index, UniqueConstraint, Date
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 import uuid
 
@@ -286,22 +286,28 @@ class UsageEvent(Base):
 
 class Plan(Base):
     """
-    Catálogo de planes comerciales.
+    Catálogo de planes comerciales (en euros).
     Los límites NULL significan ilimitado (plan enterprise).
-    price_monthly_cents: precio en céntimos (€), 0 = gratuito.
+    price_monthly_cents: precio mensual en céntimos de euro (ej: 1900 = 19€), 0 = gratuito.
+    allow_overage: si True, se permite consumo extra cobrado; si False, se rechaza.
+    overage_*_cents: precios por unidad de consumo extra, en céntimos de euro.
     """
     __tablename__ = "plans"
 
-    id                        = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    code                      = Column(String(40),  nullable=False, unique=True)
-    display_name              = Column(String(128), nullable=False)
-    max_docs_per_month        = Column(Integer,    nullable=True)   # NULL = ilimitado
-    max_extractions_per_month = Column(Integer,    nullable=True)
-    max_tokens_per_month      = Column(BigInteger, nullable=True)
-    max_users                 = Column(Integer,    nullable=True)
-    price_monthly_cents       = Column(Integer,    nullable=False, default=0)
-    is_active                 = Column(Boolean,    nullable=False, default=True)
-    created_at                = Column(TIMESTAMP(timezone=True), server_default=func.now())
+    id                          = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    code                        = Column(String(40),  nullable=False, unique=True)
+    display_name                = Column(String(128), nullable=False)
+    max_docs_per_month          = Column(Integer,    nullable=True)   # NULL = ilimitado
+    max_extractions_per_month   = Column(Integer,    nullable=True)
+    max_tokens_per_month        = Column(BigInteger, nullable=True)
+    max_users                   = Column(Integer,    nullable=True)
+    price_monthly_cents         = Column(Integer,    nullable=False, default=0)
+    allow_overage               = Column(Boolean,    nullable=False, default=True)
+    overage_doc_cents           = Column(Integer,    nullable=False, default=20)      # 0,20€
+    overage_extraction_cents    = Column(Integer,    nullable=False, default=10)      # 0,10€
+    overage_user_cents          = Column(Integer,    nullable=False, default=500)     # 5,00€
+    is_active                   = Column(Boolean,    nullable=False, default=True)
+    created_at                  = Column(TIMESTAMP(timezone=True), server_default=func.now())
 
     __table_args__ = (
         Index("idx_plans_code",      "code"),
@@ -374,4 +380,45 @@ class WebhookConfig(Base):
     __table_args__ = (
         Index("idx_webhooks_bu", "bu_id"),
         Index("idx_webhooks_active", "is_active"),
+    )
+
+
+class Invoice(Base):
+    """
+    Factura mensual por BU.
+    Generada automáticamente el 1º de cada mes.
+    Contiene el precio del plan + cargos por overage.
+    Estados: pending (sin pagar), paid, overdue (vencida), suspended (acceso bloqueado).
+    """
+    __tablename__ = "invoices"
+
+    id                              = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    bu_id                           = Column(PG_UUID(as_uuid=True), ForeignKey("business_units.id", ondelete="CASCADE"), nullable=False)
+    period_month                    = Column(Date, nullable=False)  # "2026-05-01"
+    plan_id                         = Column(PG_UUID(as_uuid=True), ForeignKey("plans.id"), nullable=True)
+
+    # Cargos
+    plan_price_cents                = Column(Integer, nullable=False, default=0)
+    overage_docs                    = Column(Integer, nullable=False, default=0)
+    overage_docs_cost_cents         = Column(Integer, nullable=False, default=0)
+    overage_extractions             = Column(Integer, nullable=False, default=0)
+    overage_extractions_cost_cents  = Column(Integer, nullable=False, default=0)
+    overage_users                   = Column(Integer, nullable=False, default=0)
+    overage_users_cost_cents        = Column(Integer, nullable=False, default=0)
+
+    total_cents                     = Column(Integer, nullable=False)
+
+    # Estado de pago
+    status                          = Column(String(20), nullable=False, default="pending")  # pending, paid, overdue, suspended
+    paid_at                         = Column(TIMESTAMP(timezone=True), nullable=True)
+
+    # Auditoría
+    created_at                      = Column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
+    created_by                      = Column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("bu_id", "period_month", name="uq_invoice_bu_period"),
+        Index("idx_invoices_bu", "bu_id"),
+        Index("idx_invoices_status", "status"),
+        Index("idx_invoices_period", "period_month"),
     )
