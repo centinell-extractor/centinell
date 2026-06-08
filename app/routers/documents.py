@@ -44,6 +44,7 @@ from app.dependencies.auth import AuthContext, get_bu_auth_context, require_bu_r
 from app.schemas.assessment import AssessmentRunRead
 from app.schemas.document import DocumentListResponse, DocumentRead
 from app.schemas.extraction import ExtractionRead
+from app.services.billing_service import QuotaExceededError, check_quota, record_overage
 from app.services.document_storage import DocumentStorageService
 from app.services.run_enricher import enrich_assessment_runs
 from app.services.usage_service import DOC_DELETED, DOC_UPLOADED, track_event
@@ -263,6 +264,12 @@ async def upload_document(
     if not bu or not bu.is_active:
         raise HTTPException(status_code=404, detail="BU no encontrada o inactiva")
 
+    # Verificar cuota de documentos
+    try:
+        _, overage_cost_cents = await check_quota(db, auth.bu_id, "doc.upload", quantity=1)
+    except QuotaExceededError as e:
+        raise HTTPException(status_code=429, detail=str(e))
+
     raw_mime = file.content_type or "application/octet-stream"
     if raw_mime in ("application/octet-stream", "binary/octet-stream", ""):
         guessed, _ = mimetypes.guess_type(filename)
@@ -292,6 +299,10 @@ async def upload_document(
         user_id=auth.actor_user_id,
         metadata={"filename": filename, "mime_type": raw_mime, "size_bytes": len(content)},
     )
+
+    # Registrar overage si aplica
+    if overage_cost_cents > 0:
+        await record_overage(db, auth.bu_id, "doc.upload", quantity=1, cost_cents=overage_cost_cents)
 
     await db.commit()
     await db.refresh(document)

@@ -15,6 +15,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.db.connection import AsyncSessionLocal, get_db
 from app.db.models import Document, Extraction, PromptConfig
 from app.dependencies.auth import AuthContext, get_bu_auth_context, require_bu_roles_with_audit
+from app.services.billing_service import QuotaExceededError, check_quota, record_overage
 from app.services.llm_client import call_llm_for_extraction_chained, LLMExtractionError
 from app.services.usage_service import EXTRACTION_RUN, TOKENS_CONSUMED, track_event
 from app.services.webhook import dispatch as webhook_dispatch
@@ -190,6 +191,12 @@ async def extract(
         resource_type="extraction",
     )
 
+    # Verificar cuota de extracciones
+    try:
+        _, overage_cost_cents = await check_quota(db, auth.bu_id, "extraction.run", quantity=1)
+    except QuotaExceededError as e:
+        raise HTTPException(status_code=429, detail=str(e))
+
     document_size = len(payload.document_text.encode('utf-8'))
     if document_size > MAX_DOCUMENT_SIZE_BYTES:
         size_mb = MAX_DOCUMENT_SIZE_BYTES / (1024 * 1024)
@@ -241,6 +248,11 @@ async def extract(
 
     try:
         db.add(extraction)
+
+        # Registrar overage si aplica
+        if overage_cost_cents > 0:
+            await record_overage(db, auth.bu_id, "extraction.run", quantity=1, cost_cents=overage_cost_cents)
+
         await db.commit()
         await db.refresh(extraction)
     except SQLAlchemyError:
