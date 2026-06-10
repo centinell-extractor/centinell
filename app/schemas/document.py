@@ -1,7 +1,10 @@
 from datetime import datetime
+from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
+
+from app.schemas.billing_warning import QuotaWarning
 
 
 class DocumentRead(BaseModel):
@@ -19,6 +22,7 @@ class DocumentRead(BaseModel):
     status: str          # pending | processing | processed | failed
     ocr_text: str | None
     ocr_error: str | None
+    quota_warning: Optional[QuotaWarning] = None  # Aviso de cuota si aplica
 
     model_config = ConfigDict(from_attributes=True)
 

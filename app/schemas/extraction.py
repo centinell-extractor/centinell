@@ -4,6 +4,8 @@ from typing import Any, Dict, List, Optional
 from uuid import UUID
 from datetime import datetime
 
+from app.schemas.billing_warning import QuotaWarning
+
 
 class ExtractionRead(BaseModel):
     id: UUID
@@ -22,6 +24,7 @@ class ExtractionRead(BaseModel):
     model_used: Optional[str]
     error_message: Optional[str]
     created_at: datetime
+    quota_warning: Optional[QuotaWarning] = None  # Aviso de cuota si aplica
 
     model_config = ConfigDict(from_attributes=True)
 

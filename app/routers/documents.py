@@ -55,7 +55,7 @@ router = APIRouter(prefix="/documents", tags=["documents"])
 storage_service = DocumentStorageService(DOCUMENT_STORAGE_DIR)
 
 
-def _doc_to_read(doc: Document, bu_code: str | None, created_by_name: str | None = None) -> DocumentRead:
+def _doc_to_read(doc: Document, bu_code: str | None, created_by_name: str | None = None, quota_warning=None) -> DocumentRead:
     return DocumentRead(
         id=doc.id, bu_id=doc.bu_id, bu_code=bu_code,
         created_by_name=created_by_name,
@@ -63,6 +63,7 @@ def _doc_to_read(doc: Document, bu_code: str | None, created_by_name: str | None
         size_bytes=doc.size_bytes, storage_key=doc.storage_key,
         created_by=doc.created_by, created_at=doc.created_at,
         status=doc.status, ocr_text=doc.ocr_text, ocr_error=doc.ocr_error,
+        quota_warning=quota_warning,
     )
 
 
@@ -266,7 +267,7 @@ async def upload_document(
 
     # Verificar cuota de documentos
     try:
-        _, overage_cost_cents = await check_quota(db, auth.bu_id, "doc.upload", quantity=1)
+        _, overage_cost_cents, quota_warning = await check_quota(db, auth.bu_id, "doc.upload", quantity=1)
     except QuotaExceededError as e:
         raise HTTPException(status_code=429, detail=str(e))
 
@@ -309,7 +310,7 @@ async def upload_document(
 
     background_tasks.add_task(_run_ocr_background, document.id, content, filename)
 
-    return _doc_to_read(document, bu.code)
+    return _doc_to_read(document, bu.code, quota_warning=quota_warning)
 
 
 @router.post("/from-base64", response_model=DocumentRead, status_code=201)

@@ -12,6 +12,7 @@ from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import BUPlan, Invoice, Plan, UsageEvent
+from app.schemas.billing_warning import ApproachingLimitWarning, OverageChargeWarning, QuotaWarning
 from app.services import usage_service
 
 
@@ -72,12 +73,22 @@ async def get_month_usage(db: AsyncSession, bu_id: UUID, month: datetime) -> dic
     return usage
 
 
+def _days_until_end_of_month(ref: datetime) -> int:
+    """Calcula días restantes hasta fin de mes."""
+    if ref.month == 12:
+        next_month = ref.replace(year=ref.year + 1, month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+    else:
+        next_month = ref.replace(month=ref.month + 1, day=1, hour=0, minute=0, second=0, microsecond=0)
+    delta = next_month - ref
+    return delta.days
+
+
 async def check_quota(
     db: AsyncSession,
     bu_id: UUID,
     action_type: str,
     quantity: int = 1,
-) -> tuple[bool, int]:
+) -> tuple[bool, int, QuotaWarning | None]:
     """
     Verifica si una acción se puede ejecutar bajo las restricciones de cuota.
 
@@ -88,45 +99,122 @@ async def check_quota(
         quantity: Cantidad a consumir (por defecto 1)
 
     Returns:
-        (allowed: bool, overage_cost_cents: int)
+        (allowed: bool, overage_cost_cents: int, warning: QuotaWarning | None)
         - allowed=True: acción permitida (sin overage o plan lo permite)
         - allowed=False: acción rechazada (cuota excedida, plan sin overage)
         - overage_cost_cents: costo en céntimos si hay overage (0 si no hay)
+        - warning: Aviso si está acercándose o en overage (None si todo normal)
 
     Raises:
         QuotaExceededError: si se excede cuota y plan no permite overage
     """
     plan = await get_active_plan(db, bu_id)
     if not plan:
-        # Sin plan asignado = no puede hacer nada
         raise QuotaExceededError(f"BU {bu_id} no tiene plan asignado")
 
     now = datetime.now(timezone.utc)
     usage = await get_month_usage(db, bu_id, now)
 
     overage_cost_cents = 0
+    warning: QuotaWarning | None = None
 
     if action_type == "doc.upload":
-        if usage["docs_uploaded"] >= plan.max_docs_per_month:
+        current = usage["docs_uploaded"]
+        limit = plan.max_docs_per_month
+
+        # Verificar overage (ya alcanzó el límite)
+        if current >= limit:
             if not plan.allow_overage:
                 raise QuotaExceededError(
-                    f"Cuota de documentos alcanzada (máx {plan.max_docs_per_month}/mes). "
+                    f"Cuota de documentos alcanzada (máx {limit}/mes). "
                     f"Plan {plan.code} no permite overages."
                 )
             overage_cost_cents = plan.overage_doc_cents * quantity
+            warning = OverageChargeWarning(
+                metric="documents",
+                current_usage=current + quantity,
+                limit=limit,
+                overage_units=current + quantity - limit,
+                overage_cost_eur=overage_cost_cents / 100,
+            )
+
+        # Verificar si se está acercando (80%, 90%, 95%)
+        elif current > 0:
+            percentage = (current / limit) * 100
+            if percentage >= 95:
+                warning = ApproachingLimitWarning(
+                    metric="documents",
+                    current_usage=current,
+                    limit=limit,
+                    percentage=95,
+                    days_left=_days_until_end_of_month(now),
+                )
+            elif percentage >= 90:
+                warning = ApproachingLimitWarning(
+                    metric="documents",
+                    current_usage=current,
+                    limit=limit,
+                    percentage=90,
+                    days_left=_days_until_end_of_month(now),
+                )
+            elif percentage >= 80:
+                warning = ApproachingLimitWarning(
+                    metric="documents",
+                    current_usage=current,
+                    limit=limit,
+                    percentage=80,
+                    days_left=_days_until_end_of_month(now),
+                )
 
     elif action_type == "extraction.run":
-        if usage["extractions_run"] >= plan.max_extractions_per_month:
+        current = usage["extractions_run"]
+        limit = plan.max_extractions_per_month
+
+        # Verificar overage
+        if current >= limit:
             if not plan.allow_overage:
                 raise QuotaExceededError(
-                    f"Cuota de extracciones alcanzada (máx {plan.max_extractions_per_month}/mes). "
+                    f"Cuota de extracciones alcanzada (máx {limit}/mes). "
                     f"Plan {plan.code} no permite overages."
                 )
             overage_cost_cents = plan.overage_extraction_cents * quantity
+            warning = OverageChargeWarning(
+                metric="extractions",
+                current_usage=current + quantity,
+                limit=limit,
+                overage_units=current + quantity - limit,
+                overage_cost_eur=overage_cost_cents / 100,
+            )
 
-    # Para otros tipos de acción: agregar lógica según necesidad
+        # Verificar si se está acercando
+        elif current > 0:
+            percentage = (current / limit) * 100
+            if percentage >= 95:
+                warning = ApproachingLimitWarning(
+                    metric="extractions",
+                    current_usage=current,
+                    limit=limit,
+                    percentage=95,
+                    days_left=_days_until_end_of_month(now),
+                )
+            elif percentage >= 90:
+                warning = ApproachingLimitWarning(
+                    metric="extractions",
+                    current_usage=current,
+                    limit=limit,
+                    percentage=90,
+                    days_left=_days_until_end_of_month(now),
+                )
+            elif percentage >= 80:
+                warning = ApproachingLimitWarning(
+                    metric="extractions",
+                    current_usage=current,
+                    limit=limit,
+                    percentage=80,
+                    days_left=_days_until_end_of_month(now),
+                )
 
-    return True, overage_cost_cents
+    return True, overage_cost_cents, warning
 
 
 async def record_overage(

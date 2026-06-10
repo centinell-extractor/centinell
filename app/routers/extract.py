@@ -15,6 +15,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.db.connection import AsyncSessionLocal, get_db
 from app.db.models import Document, Extraction, PromptConfig
 from app.dependencies.auth import AuthContext, get_bu_auth_context, require_bu_roles_with_audit
+from app.schemas.billing_warning import QuotaWarning
 from app.services.billing_service import QuotaExceededError, check_quota, record_overage
 from app.services.llm_client import call_llm_for_extraction_chained, LLMExtractionError
 from app.services.usage_service import EXTRACTION_RUN, TOKENS_CONSUMED, track_event
@@ -41,6 +42,7 @@ class ExtractResponse(BaseModel):
     extraction_id: Optional[UUID] = None
     config_id: UUID
     result: List[Dict[str, Any]]
+    quota_warning: Optional[QuotaWarning] = None  # Aviso de cuota si aplica
 
 
 async def _run_extraction_background(
@@ -276,6 +278,7 @@ async def extract(
         extraction_id=extraction.id,
         config_id=payload.config_id,
         result=[],
+        quota_warning=quota_warning,
     )
 
 
