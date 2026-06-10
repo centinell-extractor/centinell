@@ -15,7 +15,7 @@ from app.db.connection import get_db
 from app.db.models import BusinessUnit, PasswordResetToken, RefreshToken, User, UserBUAccess
 from app.rate_limit import limiter
 from app.dependencies.auth import get_current_user
-from app.schemas.auth import LoginRequest, LoginResponse, RefreshRequest, UserPublic
+from app.schemas.auth import LoginRequest, LoginResponse, RefreshRequest, UserPublic, TokenResponse
 from app.services.audit import log_audit_event
 from app.services.email import send_password_reset_email
 from app.services.security import (
@@ -73,7 +73,7 @@ async def _has_active_bu_access(db: AsyncSession, user_id) -> bool:
     return result.scalar_one_or_none() is not None
 
 
-@router.post("/login", response_model=LoginResponse)
+@router.post("/login", response_model=TokenResponse)
 @limiter.limit("5/minute")
 async def login(request: Request, payload: LoginRequest, response: Response, db: AsyncSession = Depends(get_db)):
     email = payload.email.lower().strip()
@@ -125,7 +125,9 @@ async def login(request: Request, payload: LoginRequest, response: Response, db:
 
     _set_auth_cookies(response, request, access_token, refresh_token)
 
-    return LoginResponse(
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
         expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         user=UserPublic(id=user.id, email=user.email, full_name=user.full_name, role=role),
     )
