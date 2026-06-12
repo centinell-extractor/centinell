@@ -12,7 +12,19 @@ from app.dependencies.auth import (
     require_bu_roles_with_audit,
     require_global_admin,
 )
+from datetime import datetime
+
 from app.schemas.auth import AssignUserBURequest, BUCreateRequest, BURead, BUUserAccessRead
+from pydantic import BaseModel
+
+
+class BUAccessWithRole(BaseModel):
+    id: UUID
+    name: str
+    code: str
+    is_active: bool
+    created_at: datetime
+    role: str
 from app.services.audit import log_audit_event
 
 router = APIRouter(prefix="/bus", tags=["business-units"])
@@ -39,6 +51,43 @@ async def list_my_business_units(
     )
     result = await db.execute(stmt)
     return list(result.scalars().all())
+
+
+@router.get("/my-access-with-roles", response_model=list[BUAccessWithRole])
+async def list_my_bus_with_roles(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.is_global_admin:
+        result = await db.execute(select(BusinessUnit).order_by(BusinessUnit.created_at.desc()))
+        return [
+            BUAccessWithRole(
+                id=bu.id, name=bu.name, code=bu.code,
+                is_active=bu.is_active, created_at=bu.created_at,
+                role="admin_global",
+            )
+            for bu in result.scalars().all()
+        ]
+
+    stmt = (
+        select(BusinessUnit, UserBUAccess.role)
+        .join(UserBUAccess, UserBUAccess.bu_id == BusinessUnit.id)
+        .where(
+            UserBUAccess.user_id == current_user.id,
+            UserBUAccess.is_active.is_(True),
+            BusinessUnit.is_active.is_(True),
+        )
+        .order_by(BusinessUnit.created_at.desc())
+    )
+    result = await db.execute(stmt)
+    return [
+        BUAccessWithRole(
+            id=bu.id, name=bu.name, code=bu.code,
+            is_active=bu.is_active, created_at=bu.created_at,
+            role=role,
+        )
+        for bu, role in result.all()
+    ]
 
 
 @router.post("/", response_model=BURead, status_code=201)

@@ -297,7 +297,9 @@ function applyRoleBasedUi() {
   });
 
   // Si la vista activa es una de las restringidas, redirigir a Documentos
-  if (!canExtract) {
+  // Pero no si hay un token en la URL (flujo de reset de contraseña)
+  const hasResetToken = new URLSearchParams(window.location.search).has("token");
+  if (!canExtract && !hasResetToken) {
     const activeView = document.querySelector(".view.active");
     if (activeView) {
       const activeName = activeView.id.replace("view-", "");
@@ -1273,6 +1275,7 @@ async function resetPassword(event) {
   if (newPwd !== confirm) { setAuthMessage("Las contraseñas no coinciden"); return; }
   const params = new URLSearchParams(window.location.search);
   const token = params.get("token");
+  console.log("🔍 DEBUG reset-password:", { search: window.location.search, token, hasToken: !!token });
   if (!token) { setAuthMessage("Token no encontrado en la URL"); return; }
   try {
     setAuthMessage("Cambiando contraseña...");
@@ -3238,6 +3241,13 @@ function activateView(view, historyMode = "push", params = {}) {
     else if (view === "prompt-detail" && params.promptId) path = `/prompts/${params.promptId}`;
     else if (view === "prompt-detail") path = "/prompts/new";
     else path = VIEW_PATHS[view] ?? `/${view}`;
+
+    // Preserva el token de reset en la URL si existe
+    const search = window.location.search;
+    if (search.includes("token=")) {
+      path += search;
+    }
+
     if (historyMode === "push") history.pushState({ view, ...params }, "", path);
     else history.replaceState({ view, ...params }, "", path);
   }
@@ -3860,8 +3870,11 @@ function renderResult(result, descriptionMap = {}) {
 
     const valueTd = document.createElement("td");
     const input = document.createElement("input");
+    input.type = "text";
     input.dataset.answerTitle = row.title;
     input.value = answer;
+    input.title = `Editar ${row.title}`;
+    input.setAttribute("aria-label", `Valor de ${row.title}`);
     valueTd.appendChild(input);
 
     const detailsWrap = document.createElement("div");
@@ -5071,6 +5084,43 @@ function wireActions() {
     if (event.key === "Escape" && state.confirmModalResolver) {
       closeConfirmModal(false);
     }
+    if (event.key === "Escape") {
+      closeAccountModal("accountSettingsModal");
+      closeAccountModal("accountOrgsModal");
+      closeAccountDropdown();
+    }
+  });
+
+  // ── Account menu dropdown ──────────────────────────────────────
+  on("accountMenuBtn", "click", (e) => {
+    e.stopPropagation();
+    const dropdown = el("accountDropdown");
+    const btn = el("accountMenuBtn");
+    const isOpen = dropdown.classList.toggle("is-open");
+    btn.setAttribute("aria-expanded", isOpen ? "true" : "false");
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!el("accountMenu")?.contains(e.target)) {
+      closeAccountDropdown();
+    }
+  });
+
+  on("accountSettingsBtn", "click", () => { closeAccountDropdown(); openAccountSettings(); });
+  on("accountOrgsBtn", "click", () => { closeAccountDropdown(); openAccountOrgs(); });
+  on("accountSettingsCloseBtn", "click", () => closeAccountModal("accountSettingsModal"));
+  on("accountOrgsCloseBtn", "click", () => closeAccountModal("accountOrgsModal"));
+  on("accountProfileForm", "submit", saveAccountProfile);
+  on("accountPasswordForm", "submit", changeAccountPassword);
+  on("accountDeleteBtn", "click", deleteAccount);
+
+  [el("accountSettingsModal"), el("accountOrgsModal")].forEach((modal) => {
+    if (!modal) return;
+    modal.addEventListener("click", (e) => {
+      if (e.target?.dataset?.accountClose === "backdrop") {
+        closeAccountModal(modal.id);
+      }
+    });
   });
 }
 
@@ -5162,6 +5212,157 @@ async function adminCreateBu() {
   }
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// GESTIÓN DE CUENTA
+// ══════════════════════════════════════════════════════════════════════════════
+
+function closeAccountDropdown() {
+  const dropdown = el("accountDropdown");
+  const btn = el("accountMenuBtn");
+  if (dropdown) dropdown.classList.remove("is-open");
+  if (btn) btn.setAttribute("aria-expanded", "false");
+}
+
+function openAccountModal(id) {
+  const modal = el(id);
+  if (!modal) return;
+  modal.style.display = "grid";
+  modal.setAttribute("aria-hidden", "false");
+}
+
+function closeAccountModal(id) {
+  const modal = el(id);
+  if (!modal) return;
+  modal.style.display = "";
+  modal.setAttribute("aria-hidden", "true");
+}
+
+const ROLE_LABELS = {
+  admin_global: "Administrador global",
+  bu_admin: "Administrador de BU",
+  bu_user: "Usuario",
+  bu_viewer: "Lector",
+};
+
+async function openAccountSettings() {
+  openAccountModal("accountSettingsModal");
+  const user = state.currentUser;
+  if (user) {
+    el("accountFullName").value = user.full_name || "";
+    el("accountEmail").value = user.email || "";
+  }
+  el("accountCurrentPwd").value = "";
+  el("accountNewPwd").value = "";
+  el("accountNewPwd2").value = "";
+  setAccountMsg("accountProfileMsg", "", "");
+  setAccountMsg("accountPasswordMsg", "", "");
+}
+
+function setAccountMsg(id, text, type) {
+  const el_ = el(id);
+  if (!el_) return;
+  el_.textContent = text;
+  el_.className = "account-msg" + (type ? ` account-msg--${type}` : "");
+}
+
+async function saveAccountProfile(e) {
+  e.preventDefault();
+  const fullName = el("accountFullName").value.trim();
+  const email = el("accountEmail").value.trim().toLowerCase();
+  if (!email) { setAccountMsg("accountProfileMsg", "El email es obligatorio", "error"); return; }
+  setAccountMsg("accountProfileMsg", "Guardando...", "loading");
+  try {
+    await api("/auth/me", {
+      method: "PATCH",
+      body: JSON.stringify({ full_name: fullName || null, email }),
+    });
+    state.currentUser = { ...state.currentUser, full_name: fullName || null, email };
+    persistSession();
+    el("authUserLabel").textContent = email;
+    setAccountMsg("accountProfileMsg", "Cambios guardados", "success");
+  } catch (err) {
+    setAccountMsg("accountProfileMsg", err.message || "Error al guardar", "error");
+  }
+}
+
+async function changeAccountPassword(e) {
+  e.preventDefault();
+  const current = el("accountCurrentPwd").value;
+  const next = el("accountNewPwd").value;
+  const next2 = el("accountNewPwd2").value;
+  if (!current) { setAccountMsg("accountPasswordMsg", "Introduce tu contraseña actual", "error"); return; }
+  if (next.length < 8) { setAccountMsg("accountPasswordMsg", "La nueva contraseña debe tener al menos 8 caracteres", "error"); return; }
+  if (next !== next2) { setAccountMsg("accountPasswordMsg", "Las contraseñas no coinciden", "error"); return; }
+  setAccountMsg("accountPasswordMsg", "Cambiando contraseña...", "loading");
+  try {
+    await api("/auth/change-password", {
+      method: "POST",
+      body: JSON.stringify({ current_password: current, new_password: next }),
+    });
+    el("accountCurrentPwd").value = "";
+    el("accountNewPwd").value = "";
+    el("accountNewPwd2").value = "";
+    setAccountMsg("accountPasswordMsg", "Contraseña cambiada. Cierra sesión y vuelve a entrar.", "success");
+  } catch (err) {
+    setAccountMsg("accountPasswordMsg", err.message || "Error al cambiar contraseña", "error");
+  }
+}
+
+async function deleteAccount() {
+  const confirmed = await confirmModal(
+    "¿Eliminar cuenta?",
+    "Esta acción es permanente. Perderás acceso a todas tus Business Units y no podrá deshacerse."
+  );
+  if (!confirmed) return;
+  try {
+    await api("/auth/me", { method: "DELETE" });
+  } catch (_) { /* ignore — session cleared server-side */ }
+  state.currentUser = null;
+  state.selectedBuId = null;
+  state.businessUnits = [];
+  persistSession();
+  renderBuOptions();
+  updateAuthUi();
+  closeAccountModal("accountSettingsModal");
+}
+
+async function openAccountOrgs() {
+  openAccountModal("accountOrgsModal");
+  const list = el("accountOrgsList");
+  list.innerHTML = `<p class="account-orgs-empty">Cargando...</p>`;
+  try {
+    const orgs = await api("/bus/my-access-with-roles");
+    if (!orgs.length) {
+      list.innerHTML = `<p class="account-orgs-empty">No tienes acceso a ninguna organización.</p>`;
+      return;
+    }
+    list.innerHTML = orgs.map((org) => `
+      <div class="account-org-card">
+        <div class="account-org-info">
+          <span class="account-org-name">${org.name}</span>
+          <span class="account-org-code">${org.code}</span>
+          <span class="account-org-role">${ROLE_LABELS[org.role] || org.role}</span>
+        </div>
+        <button type="button" class="primary account-org-access-btn" data-bu-id="${org.id}">Acceder</button>
+      </div>
+    `).join("");
+
+    list.querySelectorAll(".account-org-access-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const buId = btn.dataset.buId;
+        const buSelect = el("buSelect");
+        if (buSelect) {
+          buSelect.value = buId;
+          buSelect.dispatchEvent(new Event("change"));
+        }
+        closeAccountModal("accountOrgsModal");
+      });
+    });
+  } catch (err) {
+    list.innerHTML = `<p class="account-orgs-empty" style="color:var(--error)">Error: ${err.message}</p>`;
+  }
+}
+
 async function bootstrap() {
   // Remove legacy localStorage token keys from pre-cookie auth
   localStorage.removeItem("centinell.accessToken");
@@ -5173,10 +5374,11 @@ async function bootstrap() {
   wireNavigation();
   wireActions();
 
-  // Detecta flujo de reset de contraseña desde URL
+  // Detecta flujo de reset de contraseña desde URL ANTES de actualizar UI
   if (new URLSearchParams(window.location.search).has("token")) {
     showAuthPanel("resetPasswordForm");
   }
+
   updateAuthUi();
   renderBuOptions();
   setResponseFormatMode("standard");

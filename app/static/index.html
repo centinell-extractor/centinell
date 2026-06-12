@@ -2,6 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
+  <meta name="content-type" content="text/html; charset=utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Centinell Console</title>
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v=20260529a">
@@ -19,13 +20,13 @@
       <form id="loginForm" class="auth-form" autocomplete="on">
         <label>
           Email
-          <input id="loginEmail" type="email" placeholder="admin@empresa.com" autocomplete="username">
+          <input id="loginEmail" type="email" placeholder="admin@empresa.com" autocomplete="username" title="Email" aria-label="Email">
         </label>
         <label>
           Password
-          <input id="loginPassword" type="password" placeholder="••••••••••" autocomplete="current-password">
+          <input id="loginPassword" type="password" placeholder="••••••••••" autocomplete="current-password" title="Contraseña" aria-label="Contraseña">
         </label>
-        <button id="loginBtn" type="submit">Entrar</button>
+        <button id="loginBtn" type="submit" title="Entrar">Entrar</button>
       </form>
       <p class="auth-forgot"><button type="button" id="forgotPasswordLink">¿Olvidaste tu contraseña?</button></p>
 
@@ -34,10 +35,10 @@
         <p class="auth-form-desc">Introduce tu email y te enviaremos un enlace para restablecer la contraseña.</p>
         <label>
           Email
-          <input id="forgotEmail" type="email" placeholder="admin@empresa.com" autocomplete="username">
+          <input id="forgotEmail" type="email" placeholder="admin@empresa.com" autocomplete="username" title="Email" aria-label="Email para recuperación">
         </label>
-        <button id="forgotPasswordBtn" type="submit">Enviar enlace</button>
-        <button type="button" id="backToLoginBtn" class="secondary">Volver al login</button>
+        <button id="forgotPasswordBtn" type="submit" title="Enviar enlace">Enviar enlace</button>
+        <button type="button" id="backToLoginBtn" class="secondary" title="Volver al login">Volver al login</button>
       </form>
 
       <!-- Panel: reset-password (visible cuando URL tiene ?token=...) -->
@@ -45,13 +46,13 @@
         <p class="auth-form-desc">Introduce tu nueva contraseña.</p>
         <label>
           Nueva contraseña
-          <input id="resetPasswordInput" type="password" placeholder="Mínimo 8 caracteres" autocomplete="new-password">
+          <input id="resetPasswordInput" type="password" placeholder="Mínimo 8 caracteres" autocomplete="new-password" title="Nueva contraseña" aria-label="Nueva contraseña">
         </label>
         <label>
           Confirmar contraseña
-          <input id="resetPasswordConfirm" type="password" placeholder="Repite la contraseña" autocomplete="new-password">
+          <input id="resetPasswordConfirm" type="password" placeholder="Repite la contraseña" autocomplete="new-password" title="Confirmar contraseña" aria-label="Confirmar contraseña">
         </label>
-        <button id="resetPasswordBtn" type="submit">Cambiar contraseña</button>
+        <button id="resetPasswordBtn" type="submit" title="Cambiar contraseña">Cambiar contraseña</button>
       </form>
 
       <!-- Panel: change-password (primer login con contraseña temporal) -->
@@ -60,13 +61,13 @@
         <p class="auth-form-desc">Por seguridad debes crear una contraseña propia antes de continuar.</p>
         <label>
           Nueva contraseña
-          <input id="changePasswordInput" type="password" placeholder="Mínimo 8 caracteres" autocomplete="new-password">
+          <input id="changePasswordInput" type="password" placeholder="Mínimo 8 caracteres" autocomplete="new-password" title="Nueva contraseña" aria-label="Nueva contraseña">
         </label>
         <label>
           Confirmar contraseña
-          <input id="changePasswordConfirm" type="password" placeholder="Repite la contraseña" autocomplete="new-password">
+          <input id="changePasswordConfirm" type="password" placeholder="Repite la contraseña" autocomplete="new-password" title="Confirmar contraseña" aria-label="Confirmar contraseña">
         </label>
-        <button id="changePasswordBtn" type="submit">Establecer contraseña</button>
+        <button id="changePasswordBtn" type="submit" title="Establecer contraseña">Establecer contraseña</button>
       </form>
 
       <div id="authAlert" class="auth-alert">
@@ -87,7 +88,7 @@
     <div class="bu-switcher">
       <label for="buSelect">BU:</label>
       <div class="bu-switcher-controls">
-        <select id="buSelect" disabled>
+        <select id="buSelect" disabled title="Seleccionar Business Unit" aria-label="Seleccionar Business Unit">
           <option value="">Selecciona BU</option>
         </select>
       </div>
@@ -100,6 +101,16 @@
       </button>
       <div id="authUserBox" class="auth-user-box">
         <span id="authUserLabel"></span>
+        <div class="account-menu" id="accountMenu">
+          <button id="accountMenuBtn" class="secondary account-menu-trigger" type="button" aria-haspopup="true" aria-expanded="false">
+            Cuenta
+            <svg class="account-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5z"/></svg>
+          </button>
+          <ul class="account-dropdown" id="accountDropdown" role="menu">
+            <li><button type="button" role="menuitem" id="accountSettingsBtn">Ajustes</button></li>
+            <li><button type="button" role="menuitem" id="accountOrgsBtn">Organizaciones</button></li>
+          </ul>
+        </div>
         <button id="logoutBtn" class="secondary" type="button">Salir</button>
       </div>
     </div>
@@ -169,11 +180,11 @@
       </div>
 
       <div class="sidebar-footer">
-        <a class="sidebar-footer-link" href="#" aria-label="Help Guide" title="Help Guide">
+        <a class="sidebar-footer-link" href="#" aria-label="Help Guide — Guía de Ayuda" title="Help Guide">
           <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 .001 20.001A10 10 0 0 0 12 2zm0 17a1.25 1.25 0 1 1 0-2.5A1.25 1.25 0 0 1 12 19zm1.02-5.9-.52.3V14h-1.5v-1.35c0-.55.3-1.06.78-1.34l.72-.42a1.7 1.7 0 0 0 .85-1.47A1.98 1.98 0 0 0 11.36 7.5c-.9 0-1.7.57-1.96 1.42l-1.44-.44A3.47 3.47 0 0 1 11.36 6c1.9 0 3.48 1.55 3.48 3.42 0 1.14-.61 2.2-1.8 2.88z"/></svg></span>
           <span class="nav-label">Help Guide</span>
         </a>
-        <a class="sidebar-footer-link" href="#" aria-label="The Hub" title="The Hub">
+        <a class="sidebar-footer-link" href="#" aria-label="The Hub — Centro de Recursos" title="The Hub">
           <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 4h7v7H4V4zm9 0h7v7h-7V4zM4 13h7v7H4v-7zm9 0h7v7h-7v-7z"/></svg></span>
           <span class="nav-label">The Hub</span>
         </a>
@@ -187,13 +198,13 @@
           <div class="run-form-col">
             <label>
               Configuración
-              <select id="configSelect"></select>
+              <select id="configSelect" title="Seleccionar configuración" aria-label="Seleccionar configuración"></select>
             </label>
             <div class="file-upload-row">
               <label for="documentFile">Subir archivo</label>
               <div class="file-upload-controls">
                 <input id="documentFile" type="file" accept=".txt,.md,.json,.csv,.xml,.html,.pdf,.docx">
-                <button id="parseFileBtn" class="secondary" type="button">Ejecutar OCR</button>
+                <button id="parseFileBtn" class="secondary" type="button" title="Ejecutar reconocimiento óptico de caracteres">Ejecutar OCR</button>
               </div>
               <span class="field-hint">Soporta txt, csv, pdf y docx.</span>
             </div>
@@ -202,12 +213,12 @@
 
         <label>
           Documento (texto)
-          <textarea id="documentText" rows="10" placeholder="Pega aquí el contenido del documento"></textarea>
+          <textarea id="documentText" rows="10" placeholder="Pega aquí el contenido del documento" title="Contenido del documento" aria-label="Contenido del documento"></textarea>
         </label>
 
         <div class="actions">
-          <button id="runExtractionBtn">Ejecutar extracción</button>
-          <button id="saveValidationBtn" class="secondary">Sobreescribir cambios</button>
+          <button id="runExtractionBtn" type="button" title="Ejecutar extracción de datos">Ejecutar extracción</button>
+          <button id="saveValidationBtn" class="secondary" type="button" title="Sobreescribir cambios validados">Sobreescribir cambios</button>
         </div>
 
         <div id="runMessage" class="message" role="status" aria-live="polite"></div>
@@ -266,16 +277,16 @@
           <div style="display:flex;gap:0.5rem;align-items:center">
             <div id="batchBar" class="batch-bar" style="display:none">
               <span id="batchCount">0 seleccionados</span>
-              <select id="batchAssessSelect" style="font-size:0.8rem;padding:0.25rem 0.5rem">
+              <select id="batchAssessSelect" style="font-size:0.8rem;padding:0.25rem 0.5rem" title="Seleccionar evaluación para lote" aria-label="Seleccionar evaluación">
                 <option value="">Evaluación…</option>
               </select>
               <button id="batchRunBtn" class="secondary" type="button" style="font-size:0.8rem;padding:0.3rem 0.8rem">Ejecutar en lote</button>
               <button id="batchCancelBtn" class="secondary" type="button" style="font-size:0.8rem;padding:0.3rem 0.6rem">✕</button>
             </div>
-            <button id="docsSelectModeBtn" class="icon-btn secondary" type="button" title="Selección múltiple para lote">
+            <button id="docsSelectModeBtn" class="icon-btn secondary" type="button" title="Selección múltiple para lote" aria-label="Activar selección múltiple para lote">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h2V3H3v2zm0 8h2v-2H3v2zm0 8h2v-2H3v2zm4-16v2h14V5H7zm0 10h14v-2H7v2zm0 8h14v-2H7v2z"/></svg>
             </button>
-            <button id="docsRefreshBtn" class="icon-btn secondary" type="button" title="Recargar">
+            <button id="docsRefreshBtn" class="icon-btn secondary" type="button" title="Recargar" aria-label="Recargar documentos">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
             </button>
           </div>
@@ -308,7 +319,7 @@
       <!-- ══════════════ DOCUMENTO DETALLE ══════════════ -->
       <section id="view-doc-detail" class="card view">
         <div class="doc-detail-topbar">
-          <button id="docDetailBackBtn" class="back-btn secondary" type="button">
+          <button id="docDetailBackBtn" class="back-btn secondary" type="button" title="Volver a documentos">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
             Documentos
           </button>
@@ -330,7 +341,7 @@
               <h3>Ejecutar evaluación</h3>
               <label>
                 Evaluación
-                <select id="docDetailAssessSelect">
+                <select id="docDetailAssessSelect" title="Seleccionar evaluación" aria-label="Seleccionar evaluación para ejecutar">
                   <option value="">Selecciona evaluación</option>
                 </select>
               </label>
@@ -349,7 +360,7 @@
       <!-- ══════════════ RUN DETALLE ══════════════ -->
       <section id="view-run-detail" class="card view">
         <div class="doc-detail-topbar">
-          <button id="runDetailBackBtn" class="back-btn secondary" type="button">
+          <button id="runDetailBackBtn" class="back-btn secondary" type="button" title="Volver">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
             <span id="runDetailBackLabel">Documento</span>
           </button>
@@ -366,7 +377,7 @@
           <div class="run-detail-doc">
             <div class="run-detail-doc-header">
               <div class="run-detail-doc-title">
-                <button id="runDetailCollapseBtn" class="icon-btn secondary" type="button" title="Ocultar documento">
+                <button id="runDetailCollapseBtn" class="icon-btn secondary" type="button" title="Ocultar documento" aria-label="Ocultar documento">
                   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
                 </button>
                 <h3>Documento</h3>
@@ -394,25 +405,25 @@
             <h3 id="assessFormTitle">Nueva evaluación</h3>
             <label>
               Nombre
-              <input id="assessName" type="text" placeholder="Ej: Análisis de factura">
+              <input id="assessName" type="text" placeholder="Ej: Análisis de factura" title="Nombre de la evaluación" aria-label="Nombre de la evaluación">
             </label>
             <label>
               Descripción <span class="field-hint">(opcional)</span>
-              <textarea id="assessDescription" rows="2" placeholder="Qué extrae esta evaluación..."></textarea>
+              <textarea id="assessDescription" rows="2" placeholder="Qué extrae esta evaluación..." title="Descripción de la evaluación" aria-label="Descripción de la evaluación"></textarea>
             </label>
             <div class="assess-configs-picker">
               <label for="assessConfigSelect">Agregar configuración</label>
               <div class="assess-config-add-row">
-                <select id="assessConfigSelect"></select>
-                <button id="assessAddConfigBtn" type="button" class="secondary">+ Agregar</button>
+                <select id="assessConfigSelect" title="Seleccionar configuración" aria-label="Seleccionar configuración para agregar"></select>
+                <button id="assessAddConfigBtn" type="button" class="secondary" title="Agregar configuración">+ Agregar</button>
               </div>
               <ul id="assessConfigList" class="assess-config-list">
                 <li class="assess-config-empty">Agrega al menos una configuración</li>
               </ul>
             </div>
             <div class="actions">
-              <button id="assessSaveBtn" type="button">Guardar</button>
-              <button id="assessCancelBtn" type="button" class="secondary" style="display:none">Cancelar edición</button>
+              <button id="assessSaveBtn" type="button" title="Guardar evaluación">Guardar</button>
+              <button id="assessCancelBtn" type="button" class="secondary" style="display:none" title="Cancelar edición">Cancelar edición</button>
             </div>
             <div id="assessFormMessage" class="message" role="status" aria-live="polite"></div>
           </div>
@@ -432,7 +443,7 @@
       <section id="view-assessment-detail" class="card view">
         <!-- Fila 1: volver -->
         <div style="margin-bottom:0.75rem">
-          <button id="assessDetailBackBtn" class="secondary" style="display:inline-flex;align-items:center;gap:0.35rem;font-size:0.82rem">
+          <button id="assessDetailBackBtn" class="secondary" style="display:inline-flex;align-items:center;gap:0.35rem;font-size:0.82rem" title="Volver a evaluaciones">
             <svg viewBox="0 0 24 24" aria-hidden="true" style="width:15px;height:15px;fill:currentColor;flex-shrink:0"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
             Evaluaciones
           </button>
@@ -458,12 +469,12 @@
             <div class="assess-run-form card-inner">
               <label>
                 Documento
-                <select id="assessDetailDocSelect">
+                <select id="assessDetailDocSelect" title="Seleccionar documento" aria-label="Seleccionar documento para evaluar">
                   <option value="">Selecciona un documento procesado</option>
                 </select>
               </label>
               <div class="actions">
-                <button id="assessDetailRunBtn" type="button">Ejecutar evaluación</button>
+                <button id="assessDetailRunBtn" type="button" title="Ejecutar evaluación">Ejecutar evaluación</button>
               </div>
               <div id="assessDetailRunMessage" class="message" role="status" aria-live="polite"></div>
             </div>
@@ -492,11 +503,11 @@
         <div class="collections-setup grid-2">
           <label>
             Evaluación
-            <select id="colAssessSelect"></select>
+            <select id="colAssessSelect" title="Seleccionar evaluación para colección" aria-label="Seleccionar evaluación"></select>
           </label>
           <label>
             Nombre de la colección
-            <input id="colName" type="text" placeholder="Ej: Facturas Mayo 2026">
+            <input id="colName" type="text" placeholder="Ej: Facturas Mayo 2026" title="Nombre de la colección" aria-label="Nombre de la colección">
           </label>
         </div>
 
@@ -581,7 +592,7 @@
       <section id="view-prompt-detail" class="card view">
         <!-- Fila 1: volver -->
         <div style="margin-bottom:0.75rem">
-          <button id="promptDetailBackBtn" class="secondary" style="display:inline-flex;align-items:center;gap:0.35rem;font-size:0.82rem">
+          <button id="promptDetailBackBtn" class="secondary" style="display:inline-flex;align-items:center;gap:0.35rem;font-size:0.82rem" title="Volver a prompts">
             <svg viewBox="0 0 24 24" aria-hidden="true" style="width:15px;height:15px;fill:currentColor;flex-shrink:0"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
             Prompts
           </button>
@@ -593,11 +604,11 @@
         <div class="grid-2">
           <label>
             Nombre
-            <input id="cfgName" type="text" placeholder="Facturas proveedor">
+            <input id="cfgName" type="text" placeholder="Facturas proveedor" title="Nombre del prompt" aria-label="Nombre del prompt">
           </label>
           <label>
             Modelo
-            <select id="cfgModel">
+            <select id="cfgModel" title="Seleccionar modelo de IA" aria-label="Seleccionar modelo">
               <optgroup label="GPT-4o">
                 <option value="gpt-4o">gpt-4o</option>
                 <option value="gpt-4o-mini">gpt-4o-mini</option>
@@ -617,26 +628,26 @@
         <label id="cfgTemperatureWrap">
           Temperatura <span class="field-hint">0 = determinista · 2 = muy creativo</span>
           <div class="temp-row">
-            <input id="cfgTemperature" type="range" min="0" max="2" step="0.1" value="0">
+            <input id="cfgTemperature" type="range" min="0" max="2" step="0.1" value="0" title="Ajustar temperatura" aria-label="Temperatura del modelo">
             <span id="cfgTemperatureDisplay" class="temp-value">0.0</span>
           </div>
         </label>
 
         <label>
           Descripción
-          <input id="cfgDescription" type="text" placeholder="Extracción de campos de factura">
+          <input id="cfgDescription" type="text" placeholder="Extracción de campos de factura" title="Descripción del prompt" aria-label="Descripción del prompt">
         </label>
 
         <label>
           Instrucciones base (debe incluir un placeholder {{...}})
-          <textarea id="cfgPromptBase" rows="7"></textarea>
+          <textarea id="cfgPromptBase" rows="7" title="Instrucciones del prompt" aria-label="Instrucciones base del prompt"></textarea>
         </label>
 
         <div class="response-format-header">
           <h3>Response format</h3>
           <div class="response-format-controls">
             <span class="compact-label">Modo</span>
-            <select id="cfgResponseFormatMode">
+            <select id="cfgResponseFormatMode" title="Seleccionar modo de formato" aria-label="Seleccionar modo de respuesta">
               <option value="standard">Estándar</option>
               <option value="custom">Custom</option>
             </select>
@@ -644,7 +655,7 @@
         </div>
         <div id="responseFormatPanel" class="response-format-panel">
           <p class="field-hint">En modo Estándar es solo lectura. En modo Custom puedes editar JSON válido.</p>
-          <textarea id="cfgResponseFormat" rows="3"></textarea>
+          <textarea id="cfgResponseFormat" rows="3" title="Formato de respuesta en JSON" aria-label="Formato de respuesta"></textarea>
         </div>
 
         <h3>Preview del prompt final</h3>
@@ -658,15 +669,15 @@
         <div class="var-form-row">
           <label>
             Nombre
-            <input id="varName" type="text" placeholder="Ej: NumeroFactura">
+            <input id="varName" type="text" placeholder="Ej: NumeroFactura" title="Nombre de la variable" aria-label="Nombre de la variable">
           </label>
           <label class="var-desc-label">
             Descripción
-            <textarea id="varDescription" rows="2" placeholder="Qué representa este campo en el documento" style="resize:vertical;min-height:2.6rem"></textarea>
+            <textarea id="varDescription" rows="2" placeholder="Qué representa este campo en el documento" style="resize:vertical;min-height:2.6rem" title="Descripción de la variable" aria-label="Descripción de la variable"></textarea>
           </label>
           <label class="var-type-label">
             Tipo
-            <select id="varType">
+            <select id="varType" title="Seleccionar tipo de dato" aria-label="Tipo de variable">
               <option value="string">string</option>
               <option value="number">number</option>
             </select>
@@ -711,10 +722,10 @@
           <h3>Copiar prompt a otra BU</h3>
           <p class="section-lead">Duplica este prompt en otra BU (solo admin_global).</p>
           <div class="copy-to-bu-row">
-            <select id="copyToBuSelect">
+            <select id="copyToBuSelect" title="Seleccionar Business Unit destino" aria-label="Seleccionar Business Unit destino">
               <option value="">Selecciona BU destino</option>
             </select>
-            <button id="copyToBuBtn" type="button" class="secondary">Copiar</button>
+            <button id="copyToBuBtn" type="button" class="secondary" title="Copiar prompt a otra BU">Copiar</button>
           </div>
           <div id="copyToBuMessage" class="message" role="status" aria-live="polite"></div>
         </div>
@@ -725,7 +736,7 @@
         <div class="grid-3">
           <label>
             Estado
-            <select id="historyStatus">
+            <select id="historyStatus" title="Filtrar por estado" aria-label="Filtrar por estado">
               <option value="">todos</option>
               <option value="processing">processing</option>
               <option value="success">success</option>
@@ -735,16 +746,16 @@
           </label>
           <label>
             Config ID (opcional)
-            <input id="historyConfigId" type="text" placeholder="UUID">
+            <input id="historyConfigId" type="text" placeholder="UUID" title="ID de configuración" aria-label="ID de configuración">
           </label>
           <label>
             Límite
-            <input id="historyLimit" type="number" value="20" min="1" max="200">
+            <input id="historyLimit" type="number" value="20" min="1" max="200" title="Límite de resultados" aria-label="Límite de resultados">
           </label>
         </div>
 
         <div class="actions">
-          <button id="loadHistoryBtn" class="secondary">Cargar historial</button>
+          <button id="loadHistoryBtn" class="secondary" type="button" title="Cargar historial de ejecuciones">Cargar historial</button>
         </div>
 
         <table>
@@ -776,29 +787,29 @@
         <div class="grid-3">
           <label>
             Event type
-            <input id="auditEventType" type="text" value="authz.denied" placeholder="authz.denied">
+            <input id="auditEventType" type="text" value="authz.denied" placeholder="authz.denied" title="Tipo de evento" aria-label="Tipo de evento">
           </label>
           <label>
             Actor user ID (opcional)
-            <input id="auditActorUserId" type="text" placeholder="UUID">
+            <input id="auditActorUserId" type="text" placeholder="UUID" title="ID del usuario" aria-label="ID del usuario">
           </label>
           <label>
             BU ID (opcional)
-            <input id="auditBuId" type="text" placeholder="UUID">
+            <input id="auditBuId" type="text" placeholder="UUID" title="ID de la Business Unit" aria-label="ID de la Business Unit">
           </label>
         </div>
         <div class="grid-2">
           <label>
             Skip
-            <input id="auditSkip" type="number" value="0" min="0">
+            <input id="auditSkip" type="number" value="0" min="0" title="Número de registros a saltar" aria-label="Número de registros a saltar">
           </label>
           <label>
             Límite
-            <input id="auditLimit" type="number" value="50" min="1" max="500">
+            <input id="auditLimit" type="number" value="50" min="1" max="500" title="Límite de resultados" aria-label="Límite de resultados">
           </label>
         </div>
         <div class="actions">
-          <button id="loadAuditBtn" class="secondary">Cargar auditoría</button>
+          <button id="loadAuditBtn" class="secondary" type="button" title="Cargar registros de auditoría">Cargar auditoría</button>
         </div>
         <div id="auditMessage" class="message" role="status" aria-live="polite"></div>
 
@@ -836,31 +847,31 @@
           <div class="grid-3 users-create-grid">
             <label>
               Email
-              <input id="usersCreateEmail" type="email" placeholder="usuario@empresa.com">
+              <input id="usersCreateEmail" type="email" placeholder="usuario@empresa.com" title="Email del usuario" aria-label="Email del usuario">
             </label>
             <label>
               Nombre completo
-              <input id="usersCreateFullName" type="text" placeholder="Nombre Apellido">
+              <input id="usersCreateFullName" type="text" placeholder="Nombre Apellido" title="Nombre completo" aria-label="Nombre completo del usuario">
             </label>
             <label>
               Password
-              <input id="usersCreatePassword" type="password" placeholder="Mínimo 10 caracteres">
+              <input id="usersCreatePassword" type="password" placeholder="Mínimo 10 caracteres" title="Contraseña temporal" aria-label="Contraseña temporal del usuario">
             </label>
           </div>
           <div class="grid-2 users-create-actions">
             <label>
               Rol BU
-              <select id="usersCreateRole">
+              <select id="usersCreateRole" title="Seleccionar rol en BU" aria-label="Seleccionar rol en BU">
                 <option value="bu_admin">bu_admin</option>
                 <option value="bu_user" selected>bu_user</option>
                 <option value="bu_viewer">bu_viewer</option>
               </select>
             </label>
-            <button id="createUserInBuBtn" type="button">Crear y asignar a esta BU</button>
+            <button id="createUserInBuBtn" type="button" title="Crear y asignar a esta BU">Crear y asignar a esta BU</button>
           </div>
         </div>
         <div class="actions">
-          <button id="reloadUsersAdminBtn" class="secondary">Recargar usuarios</button>
+          <button id="reloadUsersAdminBtn" class="secondary" type="button" title="Recargar lista de usuarios">Recargar usuarios</button>
         </div>
         <div id="usersAdminMessage" class="message" role="status" aria-live="polite"></div>
 
@@ -889,11 +900,11 @@
           <div class="grid-2">
             <label>
               Nombre descriptivo
-              <input id="apikeyName" type="text" placeholder="Power Automate — Facturas">
+              <input id="apikeyName" type="text" placeholder="Power Automate — Facturas" title="Nombre descriptivo de la API Key" aria-label="Nombre descriptivo de la API Key">
             </label>
             <label>
               Rol
-              <select id="apikeyRole">
+              <select id="apikeyRole" title="Seleccionar rol para la API Key" aria-label="Seleccionar rol">
                 <option value="bu_user" selected>bu_user</option>
                 <option value="bu_admin">bu_admin</option>
                 <option value="bu_viewer">bu_viewer</option>
@@ -901,7 +912,7 @@
             </label>
           </div>
           <div class="actions">
-            <button id="createApiKeyBtn" type="button">Generar clave</button>
+            <button id="createApiKeyBtn" type="button" title="Generar nueva API Key">Generar clave</button>
           </div>
           <div id="apikeyNewKeyBox" class="apikey-new-key-box" style="display:none">
             <p class="apikey-warning">Copia esta clave ahora. No volverá a mostrarse.</p>
@@ -913,7 +924,7 @@
         </div>
 
         <div class="actions">
-          <button id="reloadApiKeysBtn" class="secondary" type="button">Recargar lista</button>
+          <button id="reloadApiKeysBtn" class="secondary" type="button" title="Recargar lista de API Keys">Recargar lista</button>
         </div>
         <div id="apikeysMessage" class="message" role="status" aria-live="polite"></div>
 
@@ -954,8 +965,8 @@ Content-Type: application/json
         <div class="apikeys-create-box">
           <h3>Nuevo webhook</h3>
           <div class="grid-2">
-            <label>Nombre <input id="webhookName" type="text" placeholder="Power Automate — Facturas"></label>
-            <label>URL <input id="webhookUrl" type="url" placeholder="https://prod-xx.logic.azure.com/..."></label>
+            <label>Nombre <input id="webhookName" type="text" placeholder="Power Automate — Facturas" title="Nombre descriptivo del webhook" aria-label="Nombre del webhook"></label>
+            <label>URL <input id="webhookUrl" type="url" placeholder="https://prod-xx.logic.azure.com/..." title="URL del webhook" aria-label="URL del webhook"></label>
           </div>
           <label>Eventos
             <div class="webhook-events-check">
@@ -965,11 +976,11 @@ Content-Type: application/json
               <label><input type="checkbox" name="whEvent" value="assessment.failed"> assessment.failed</label>
             </div>
           </label>
-          <div class="actions"><button id="createWebhookBtn" type="button">Crear webhook</button></div>
+          <div class="actions"><button id="createWebhookBtn" type="button" title="Crear nuevo webhook">Crear webhook</button></div>
           <div id="webhookMessage" class="message" role="status" aria-live="polite"></div>
         </div>
 
-        <div class="actions"><button id="reloadWebhooksBtn" class="secondary" type="button">Recargar lista</button></div>
+        <div class="actions"><button id="reloadWebhooksBtn" class="secondary" type="button" title="Recargar lista de webhooks">Recargar lista</button></div>
         <table>
           <thead><tr><th>Nombre</th><th>URL</th><th>Eventos</th><th>Último disparo</th><th>Estado</th><th>Acciones</th></tr></thead>
           <tbody id="webhooksTableBody"><tr><td colspan="6" class="empty-row">No hay webhooks configurados.</td></tr></tbody>
@@ -1011,11 +1022,11 @@ Content-Type: application/json
           <div class="grid-2">
             <label>
               Nombre
-              <input id="adminBuName" type="text" placeholder="Ej: Recursos Humanos">
+              <input id="adminBuName" type="text" placeholder="Ej: Recursos Humanos" title="Nombre de la Business Unit" aria-label="Nombre de la Business Unit">
             </label>
             <label>
               Código <span class="field-hint">(único, sin espacios)</span>
-              <input id="adminBuCode" type="text" placeholder="Ej: RRHH" style="text-transform:uppercase">
+              <input id="adminBuCode" type="text" placeholder="Ej: RRHH" style="text-transform:uppercase" title="Código único de la BU" aria-label="Código único de la BU">
             </label>
           </div>
 
@@ -1023,15 +1034,15 @@ Content-Type: application/json
           <div class="grid-3">
             <label>
               Email
-              <input id="adminUserEmail" type="email" placeholder="admin@empresa.com">
+              <input id="adminUserEmail" type="email" placeholder="admin@empresa.com" title="Email del administrador" aria-label="Email del administrador de BU">
             </label>
             <label>
               Nombre completo
-              <input id="adminUserFullName" type="text" placeholder="Nombre Apellido">
+              <input id="adminUserFullName" type="text" placeholder="Nombre Apellido" title="Nombre completo del administrador" aria-label="Nombre completo del administrador">
             </label>
             <label>
               Rol en BU
-              <select id="adminUserRole">
+              <select id="adminUserRole" title="Seleccionar rol en BU" aria-label="Seleccionar rol en BU">
                 <option value="bu_admin" selected>bu_admin</option>
                 <option value="bu_user">bu_user</option>
                 <option value="bu_viewer">bu_viewer</option>
@@ -1045,7 +1056,7 @@ Content-Type: application/json
             </label>
           </div>
           <div class="actions" style="margin-top:1rem">
-            <button id="adminCreateBuBtn" type="button">Crear BU</button>
+            <button id="adminCreateBuBtn" type="button" title="Crear nueva Business Unit">Crear BU</button>
           </div>
           <div id="adminMessage" class="message" role="status" aria-live="polite"></div>
         </div>
@@ -1054,7 +1065,7 @@ Content-Type: application/json
         <div style="margin-top:2rem">
           <div style="display:flex;align-items:center;gap:1rem;margin-bottom:0.75rem">
             <h3 style="margin:0">Business Units</h3>
-            <button id="adminReloadBusBtn" class="secondary icon-btn" type="button" title="Recargar">
+            <button id="adminReloadBusBtn" class="secondary icon-btn" type="button" title="Recargar Business Units" aria-label="Recargar Business Units">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
             </button>
           </div>
@@ -1079,7 +1090,7 @@ Content-Type: application/json
         <h2>Cola de revisión</h2>
         <p class="section-lead">Extracciones marcadas como <strong>pending_review</strong> — bien por fallar una regla de validación automática, bien marcadas manualmente.</p>
         <div class="actions">
-          <button id="reloadReviewBtn" class="secondary" type="button">Recargar</button>
+          <button id="reloadReviewBtn" class="secondary" type="button" title="Recargar cola de revisión">Recargar</button>
         </div>
         <table>
           <thead><tr><th>Documento</th><th>Config</th><th>Fecha</th><th>Errores</th><th>Acciones</th></tr></thead>
@@ -1090,6 +1101,80 @@ Content-Type: application/json
     </section>
   </main>
 
+  </div>
+
+  <!-- Account Settings Modal -->
+  <div id="accountSettingsModal" class="account-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="accountSettingsTitle">
+    <div class="account-modal-backdrop" data-account-close="backdrop"></div>
+    <div class="account-modal-panel">
+      <div class="account-modal-header">
+        <h3 id="accountSettingsTitle">Ajustes de cuenta</h3>
+        <button type="button" class="account-modal-close icon-btn secondary" id="accountSettingsCloseBtn" aria-label="Cerrar">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+
+      <section class="account-section">
+        <h4>Perfil</h4>
+        <form id="accountProfileForm" novalidate>
+          <div class="form-row">
+            <label for="accountFullName">Nombre completo</label>
+            <input id="accountFullName" type="text" maxlength="200" placeholder="Tu nombre" autocomplete="name">
+          </div>
+          <div class="form-row">
+            <label for="accountEmail">Email</label>
+            <input id="accountEmail" type="email" maxlength="255" placeholder="tu@email.com" autocomplete="email">
+          </div>
+          <div class="account-form-actions">
+            <span id="accountProfileMsg" class="account-msg"></span>
+            <button type="submit" class="secondary">Guardar cambios</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="account-section">
+        <h4>Cambiar contraseña</h4>
+        <form id="accountPasswordForm" novalidate>
+          <div class="form-row">
+            <label for="accountCurrentPwd">Contraseña actual</label>
+            <input id="accountCurrentPwd" type="password" maxlength="256" autocomplete="current-password">
+          </div>
+          <div class="form-row">
+            <label for="accountNewPwd">Nueva contraseña</label>
+            <input id="accountNewPwd" type="password" maxlength="256" autocomplete="new-password">
+          </div>
+          <div class="form-row">
+            <label for="accountNewPwd2">Confirmar nueva contraseña</label>
+            <input id="accountNewPwd2" type="password" maxlength="256" autocomplete="new-password">
+          </div>
+          <div class="account-form-actions">
+            <span id="accountPasswordMsg" class="account-msg"></span>
+            <button type="submit" class="secondary">Cambiar contraseña</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="account-section account-danger-zone">
+        <p>Eliminar tu cuenta es una acción permanente. Perderás el acceso a todas las Business Units asignadas.</p>
+        <button type="button" id="accountDeleteBtn" class="danger">Eliminar mi cuenta</button>
+      </section>
+    </div>
+  </div>
+
+  <!-- Account Organizations Modal -->
+  <div id="accountOrgsModal" class="account-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="accountOrgsTitle">
+    <div class="account-modal-backdrop" data-account-close="backdrop"></div>
+    <div class="account-modal-panel">
+      <div class="account-modal-header">
+        <h3 id="accountOrgsTitle">Mis organizaciones</h3>
+        <button type="button" class="account-modal-close icon-btn secondary" id="accountOrgsCloseBtn" aria-label="Cerrar">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+      <div id="accountOrgsList" class="account-orgs-list">
+        <p class="account-orgs-empty">Cargando...</p>
+      </div>
+    </div>
   </div>
 
   <div id="confirmModal" class="confirm-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="confirmModalTitle">

@@ -135,7 +135,7 @@ app.include_router(webhooks.router)
 
 @app.get("/")
 async def root():
-    return FileResponse(static_dir / "index.html")
+    return FileResponse(static_dir / "index.html", media_type="text/html; charset=utf-8")
 
 
 @app.get("/favicon.ico")
@@ -170,4 +170,4 @@ async def health_check():
 
 @app.get("/{full_path:path}", include_in_schema=False)
 async def spa_catch_all(full_path: str):
-    return FileResponse(static_dir / "index.html")
+    return FileResponse(static_dir / "index.html", media_type="text/html; charset=utf-8")

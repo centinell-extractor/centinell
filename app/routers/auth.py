@@ -2,7 +2,7 @@ import secrets
 from datetime import timezone
 
 from fastapi import APIRouter, BackgroundTasks, Cookie, Depends, HTTPException, Request, Response
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -225,6 +225,79 @@ async def logout(request: Request, response: Response):
 
 class NotifyPreferenceRequest(BaseModel):
     notify_on_completion: bool
+
+
+class UpdateProfileRequest(BaseModel):
+    full_name: str | None = Field(default=None, max_length=200)
+    email: str | None = Field(default=None, min_length=5, max_length=255)
+
+
+@router.get("/me", response_model=UserPublic)
+async def get_me(current_user: User = Depends(get_current_user)):
+    role = "admin_global" if current_user.is_global_admin else "bu_user"
+    return UserPublic(
+        id=current_user.id,
+        email=current_user.email,
+        full_name=current_user.full_name,
+        role=role,
+        must_change_password=bool(current_user.must_change_password),
+    )
+
+
+@router.patch("/me", status_code=204)
+async def update_me(
+    payload: UpdateProfileRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if payload.email is not None:
+        email = payload.email.lower().strip()
+        if "@" not in email:
+            raise HTTPException(status_code=422, detail="Email inválido")
+        result = await db.execute(
+            select(User).where(User.email == email, User.id != current_user.id)
+        )
+        if result.scalars().first():
+            raise HTTPException(status_code=409, detail="Ya existe un usuario con ese email")
+        current_user.email = email
+    if payload.full_name is not None:
+        current_user.full_name = payload.full_name.strip() or None
+    db.add(current_user)
+    await log_audit_event(
+        db,
+        event_type="auth.profile_updated",
+        actor_user_id=current_user.id,
+        resource_type="user",
+        resource_id=str(current_user.id),
+        message="Perfil actualizado por el usuario",
+    )
+    await db.commit()
+
+
+@router.delete("/me", status_code=204)
+async def delete_me(
+    request: Request,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    current_user.is_active = False
+    db.add(current_user)
+    await db.execute(
+        update(RefreshToken)
+        .where(RefreshToken.user_id == current_user.id, RefreshToken.revoked_at.is_(None))
+        .values(revoked_at=utcnow())
+    )
+    await log_audit_event(
+        db,
+        event_type="auth.account_deleted",
+        actor_user_id=current_user.id,
+        resource_type="user",
+        resource_id=str(current_user.id),
+        message="Cuenta eliminada por el usuario",
+    )
+    await db.commit()
+    _clear_auth_cookies(response, secure=request.url.scheme == "https")
 
 
 @router.get("/me/notify")

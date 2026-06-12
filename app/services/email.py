@@ -131,11 +131,11 @@ async def send_welcome_email(to: str, full_name: str, temp_password: str) -> Non
 
 
 async def send_password_reset_email(to: str, token: str) -> None:
-    reset_url = f"{APP_BASE_URL}/reset-password?token={token}"
-    subject = "Recuperación de contraseña — Centinell"
+    reset_url = f"{APP_BASE_URL}/?token={token}"
+    subject = "🔐 Recuperación de contraseña — Centinell"
     body_text = (
-        f"Solicita restablecer tu contraseña en Centinell.\n\n"
-        f"Usa este enlace (válido 60 minutos):\n{reset_url}\n\n"
+        f"Has solicitado restablecer tu contraseña en Centinell.\n\n"
+        f"Usa este enlace para crear una nueva contraseña (válido 60 minutos):\n{reset_url}\n\n"
         "Si no lo solicitaste, ignora este mensaje."
     )
     body_html = f"""
@@ -152,8 +152,9 @@ async def send_password_reset_email(to: str, token: str) -> None:
     </a>
   </p>
   <p style="color:#666;font-size:0.85em">
+    <strong>Nota de seguridad:</strong><br>
     El enlace es válido durante <strong>60 minutos</strong>.<br>
-    Si no solicitaste el cambio, ignora este mensaje.
+    Si no solicitaste este cambio, ignora este mensaje. Tu contraseña seguirá siendo la misma.
   </p>
   <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0">
   <p style="color:#999;font-size:0.75em">Centinell Console</p>
