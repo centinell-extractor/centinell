@@ -54,6 +54,21 @@
         <button id="resetPasswordBtn" type="submit">Cambiar contraseña</button>
       </form>
 
+      <!-- Panel: change-password (primer login con contraseña temporal) -->
+      <form id="changePasswordForm" class="auth-form" style="display:none">
+        <p class="auth-form-desc" style="font-weight:600;color:#7c3aed">Primera sesión — Establece tu contraseña</p>
+        <p class="auth-form-desc">Por seguridad debes crear una contraseña propia antes de continuar.</p>
+        <label>
+          Nueva contraseña
+          <input id="changePasswordInput" type="password" placeholder="Mínimo 8 caracteres" autocomplete="new-password">
+        </label>
+        <label>
+          Confirmar contraseña
+          <input id="changePasswordConfirm" type="password" placeholder="Repite la contraseña" autocomplete="new-password">
+        </label>
+        <button id="changePasswordBtn" type="submit">Establecer contraseña</button>
+      </form>
+
       <div id="authAlert" class="auth-alert">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2zm0 9a1 1 0 0 1 1 1v4a1 1 0 1 1-2 0v-4a1 1 0 0 1 1-1zm0-4a1.25 1.25 0 1 1 0 2.5A1.25 1.25 0 0 1 12 7z"/></svg>
         <span id="authAlertText"></span>
@@ -142,6 +157,10 @@
         <button class="nav-btn" data-view="dashboard" title="Dashboard">
           <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></svg></span>
           <span class="nav-label">Dashboard</span>
+        </button>
+        <button class="nav-btn" data-view="admin" title="Panel Admin" id="adminNavBtn" style="display:none">
+          <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 4l5 2.18V11c0 3.5-2.33 6.79-5 7.93-2.67-1.14-5-4.43-5-7.93V7.18L12 5z"/></svg></span>
+          <span class="nav-label">Panel Admin</span>
         </button>
         <button class="nav-btn" data-view="review" title="Revisión">
           <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg></span>
@@ -981,6 +1000,80 @@ Content-Type: application/json
         </div>
       </section>
 
+      <!-- ══════════════ PANEL ADMIN GLOBAL ══════════════ -->
+      <section id="view-admin" class="card view">
+        <h2>Panel de Administración Global</h2>
+        <p class="section-lead">Crea Business Units, asigna su primer administrador y envía el email de bienvenida con contraseña temporal.</p>
+
+        <!-- ── Crear BU ─────────────────────────────────────────── -->
+        <div class="users-create-box">
+          <h3>Nueva Business Unit</h3>
+          <div class="grid-2">
+            <label>
+              Nombre
+              <input id="adminBuName" type="text" placeholder="Ej: Recursos Humanos">
+            </label>
+            <label>
+              Código <span class="field-hint">(único, sin espacios)</span>
+              <input id="adminBuCode" type="text" placeholder="Ej: RRHH" style="text-transform:uppercase">
+            </label>
+          </div>
+
+          <h4 style="margin:1rem 0 0.5rem">Primer administrador de BU <span class="field-hint">(opcional)</span></h4>
+          <div class="grid-3">
+            <label>
+              Email
+              <input id="adminUserEmail" type="email" placeholder="admin@empresa.com">
+            </label>
+            <label>
+              Nombre completo
+              <input id="adminUserFullName" type="text" placeholder="Nombre Apellido">
+            </label>
+            <label>
+              Rol en BU
+              <select id="adminUserRole">
+                <option value="bu_admin" selected>bu_admin</option>
+                <option value="bu_user">bu_user</option>
+                <option value="bu_viewer">bu_viewer</option>
+              </select>
+            </label>
+          </div>
+          <div class="card-inner notify-pref-box" style="margin-top:0.75rem">
+            <label class="toggle-label">
+              <input type="checkbox" id="adminSendWelcomeEmail" checked>
+              <span>Enviar email de bienvenida con contraseña temporal (el usuario deberá cambiarla en su primer acceso)</span>
+            </label>
+          </div>
+          <div class="actions" style="margin-top:1rem">
+            <button id="adminCreateBuBtn" type="button">Crear BU</button>
+          </div>
+          <div id="adminMessage" class="message" role="status" aria-live="polite"></div>
+        </div>
+
+        <!-- ── Lista de BUs ─────────────────────────────────────── -->
+        <div style="margin-top:2rem">
+          <div style="display:flex;align-items:center;gap:1rem;margin-bottom:0.75rem">
+            <h3 style="margin:0">Business Units</h3>
+            <button id="adminReloadBusBtn" class="secondary icon-btn" type="button" title="Recargar">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+            </button>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th>Código</th>
+                <th>Estado</th>
+                <th>Creada</th>
+              </tr>
+            </thead>
+            <tbody id="adminBusTableBody">
+              <tr><td colspan="4" class="empty-row">Cargando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       <!-- ══════════════ COLA DE REVISIÓN ══════════════ -->
       <section id="view-review" class="card view">
         <h2>Cola de revisión</h2>
@@ -1013,6 +1106,6 @@ Content-Type: application/json
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" crossorigin="anonymous"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" crossorigin="anonymous"></script>
-  <script src="/static/app.js?v=20260604i"></script>
+  <script src="/static/app.js?v=20260612a"></script>
 </body>
 </html>

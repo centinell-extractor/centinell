@@ -19,6 +19,7 @@ class UserPublic(BaseModel):
     email: str
     full_name: Optional[str] = None
     role: str
+    must_change_password: bool = False
 
 
 class TokenResponse(BaseModel):
@@ -38,9 +39,10 @@ class LoginResponse(BaseModel):
 
 class UserCreateRequest(BaseModel):
     email: str = Field(min_length=5, max_length=255)
-    password: str = Field(min_length=10, max_length=256)
+    password: Optional[str] = Field(default=None, min_length=10, max_length=256)
     full_name: Optional[str] = Field(default=None, max_length=200)
     is_global_admin: bool = False
+    send_welcome_email: bool = False
 
 
 class UserRead(BaseModel):
@@ -49,6 +51,7 @@ class UserRead(BaseModel):
     full_name: Optional[str]
     is_global_admin: bool
     is_active: bool
+    must_change_password: bool
     created_at: datetime
 
 
@@ -105,3 +108,23 @@ class AuditEventRead(BaseModel):
     message: Optional[str]
     details: Optional[dict]
     created_at: datetime
+
+
+class BUProvisionRequest(BaseModel):
+    bu_name: str = Field(min_length=2, max_length=200)
+    bu_code: str = Field(min_length=2, max_length=40, pattern="^[A-Za-z0-9_-]+$")
+    admin_email: Optional[str] = Field(default=None, min_length=5, max_length=255)
+    admin_full_name: Optional[str] = Field(default=None, max_length=200)
+    admin_role: str = Field(default="bu_admin", pattern="^(bu_admin|bu_user|bu_viewer)$")
+    send_welcome_email: bool = True
+
+
+class BUProvisionResult(BaseModel):
+    bu: BURead
+    user_created: bool
+    user_email: Optional[str] = None
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: Optional[str] = Field(default=None, min_length=1, max_length=256)
+    new_password: str = Field(min_length=8, max_length=256)

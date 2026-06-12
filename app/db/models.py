@@ -187,6 +187,7 @@ class User(Base):
     is_active = Column(Boolean, nullable=False, default=True)
     is_global_admin = Column(Boolean, nullable=False, default=False)
     notify_on_completion = Column(Boolean, nullable=False, default=False)
+    must_change_password = Column(Boolean, nullable=False, default=False)
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
     last_login_at = Column(TIMESTAMP(timezone=True), nullable=True)
 

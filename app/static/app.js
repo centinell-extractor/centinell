@@ -29,6 +29,7 @@ const VIEW_PATHS = {
   history: "/history",
   audit: "/audit",
   users: "/users",
+  admin: "/admin-panel",
 };
 const PATH_TO_VIEW = Object.fromEntries(
   Object.entries(VIEW_PATHS).map(([v, p]) => [p, v])
@@ -178,6 +179,7 @@ function applyRoleBasedUi() {
   const canManage = canManagePromptConfigs();
   const canAudit = canViewAudit();
   const canUsers = canManageUsers();
+  const canAdmin = state.currentUser?.role === "admin_global";
 
   if (configsNavBtn) {
     configsNavBtn.style.display = canManage ? "" : "none";
@@ -197,6 +199,11 @@ function applyRoleBasedUi() {
   if (usersView) {
     usersView.style.display = canUsers ? "" : "none";
   }
+
+  const adminNavBtn = el("adminNavBtn");
+  const adminView = el("view-admin");
+  if (adminNavBtn) adminNavBtn.style.display = canAdmin ? "" : "none";
+  if (adminView) adminView.style.display = canAdmin ? "" : "none";
 
   if (!canManage) {
     const activeConfigsBtn = document.querySelector('.nav-btn.active[data-view="configs"]');
@@ -218,6 +225,14 @@ function applyRoleBasedUi() {
     const activeUsersBtn = document.querySelector('.nav-btn.active[data-view="users"]');
     const activeUsersView = document.querySelector("#view-users.active");
     if (activeUsersBtn || activeUsersView) {
+      activateView("run", "replace");
+    }
+  }
+
+  if (!canAdmin) {
+    const activeAdminBtn = document.querySelector('.nav-btn.active[data-view="admin"]');
+    const activeAdminView = document.querySelector("#view-admin.active");
+    if (activeAdminBtn || activeAdminView) {
       activateView("run", "replace");
     }
   }
@@ -1192,7 +1207,7 @@ async function createDefaultAdminBu() {
 }
 
 function showAuthPanel(panel) {
-  ["loginForm", "forgotPasswordForm", "resetPasswordForm"].forEach((id) => {
+  ["loginForm", "forgotPasswordForm", "resetPasswordForm", "changePasswordForm"].forEach((id) => {
     const node = el(id);
     if (node) node.style.display = id === panel ? "" : "none";
   });
@@ -1200,6 +1215,41 @@ function showAuthPanel(panel) {
   if (forgotLink) forgotLink.closest(".auth-forgot").style.display = panel === "loginForm" ? "" : "none";
   setAuthMessage("");
   setAuthAlert(false);
+}
+
+async function changePasswordFirstLogin(event) {
+  event.preventDefault();
+  const newPwd = el("changePasswordInput").value;
+  const confirm = el("changePasswordConfirm").value;
+  if (newPwd.length < 8) { setAuthMessage("La contraseña debe tener al menos 8 caracteres"); return; }
+  if (newPwd !== confirm) { setAuthMessage("Las contraseñas no coinciden"); return; }
+  try {
+    setAuthMessage("Guardando contraseña...");
+    await api("/auth/change-password", {
+      method: "POST",
+      body: JSON.stringify({ new_password: newPwd }),
+    });
+    if (state.currentUser) {
+      state.currentUser.must_change_password = false;
+      persistSession();
+    }
+    setAuthMessage("Contraseña establecida. Cargando aplicación...");
+    updateAuthUi();
+    const buLoadState = await loadBusinessUnits();
+    if (buLoadState?.pendingAssignment) {
+      clearSessionForPendingAssignment("");
+      return;
+    }
+    await loadConfigs();
+    await loadAssessments();
+    await loadColConfigs();
+    setAuthAlert(false);
+    setAuthMessage("");
+    await loadHistory();
+    loadDocuments();
+  } catch (error) {
+    setAuthMessage(`Error: ${error.message}`);
+  }
 }
 
 async function forgotPassword(event) {
@@ -1254,6 +1304,13 @@ async function login(event) {
 
     state.currentUser = result.user || null;
     persistSession();
+
+    // First-login: must change password before accessing the app
+    if (state.currentUser?.must_change_password) {
+      showAuthPanel("changePasswordForm");
+      return;
+    }
+
     updateAuthUi();
     const buLoadState = await loadBusinessUnits();
     if (buLoadState?.pendingAssignment) {
@@ -4752,6 +4809,7 @@ function wireNavigation() {
     if (view === "webhooks") loadWebhooks();
     if (view === "dashboard") loadDashboard();
     if (view === "review") loadReviewQueue();
+    if (view === "admin" && state.currentUser?.role === "admin_global") loadAdminBus();
     if (view === "users") { if (canManageUsers()) loadUsersAdminData(); loadNotifyPreference(); }
     if (view === "documents") loadDocuments();
     if (view === "collections") { loadColConfigs(); loadColHistory(); }
@@ -4819,6 +4877,9 @@ function wireActions() {
   on("backToLoginBtn", "click", () => showAuthPanel("loginForm"));
   on("forgotPasswordForm", "submit", forgotPassword);
   on("resetPasswordForm", "submit", resetPassword);
+  on("changePasswordForm", "submit", changePasswordFirstLogin);
+  on("adminCreateBuBtn", "click", adminCreateBu);
+  on("adminReloadBusBtn", "click", loadAdminBus);
   on("logoutBtn", "click", logout);
   on("sidebarToggleBtn", "click", toggleSidebar);
   on("themeToggleBtn", "click", toggleTheme);
@@ -5011,6 +5072,94 @@ function wireActions() {
       closeConfirmModal(false);
     }
   });
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PANEL ADMIN GLOBAL
+// ══════════════════════════════════════════════════════════════════════════════
+
+function renderAdminBusTable(bus) {
+  const body = el("adminBusTableBody");
+  if (!body) return;
+  if (!bus || bus.length === 0) {
+    body.innerHTML = `<tr><td colspan="4" class="empty-row">No hay Business Units creadas.</td></tr>`;
+    return;
+  }
+  body.innerHTML = bus.map((bu) => `
+    <tr>
+      <td>${bu.name}</td>
+      <td><code>${bu.code}</code></td>
+      <td>${bu.is_active
+        ? '<span style="color:var(--success)">Activa</span>'
+        : '<span style="color:var(--error)">Inactiva</span>'
+      }</td>
+      <td>${new Date(bu.created_at).toLocaleDateString("es-ES")}</td>
+    </tr>
+  `).join("");
+}
+
+async function loadAdminBus() {
+  setMessage("adminMessage", "Cargando BUs...", "loading");
+  try {
+    const bus = await api("/bus/");
+    renderAdminBusTable(bus);
+    setMessage("adminMessage", `${bus.length} Business Unit(s)`, "success");
+  } catch (error) {
+    setMessage("adminMessage", `Error cargando BUs: ${error.message}`, "error");
+  }
+}
+
+async function adminCreateBu() {
+  const name = (el("adminBuName")?.value || "").trim();
+  const code = (el("adminBuCode")?.value || "").trim().toUpperCase();
+  const adminEmail = (el("adminUserEmail")?.value || "").trim().toLowerCase();
+  const adminFullName = (el("adminUserFullName")?.value || "").trim();
+  const adminRole = (el("adminUserRole")?.value || "bu_admin");
+  const sendWelcome = el("adminSendWelcomeEmail")?.checked ?? true;
+
+  if (!name) { setMessage("adminMessage", "El nombre de la BU es obligatorio", "error"); return; }
+  if (!code) { setMessage("adminMessage", "El código de la BU es obligatorio", "error"); return; }
+
+  setMessage("adminMessage", "Creando Business Unit...", "loading");
+
+  try {
+    const payload = {
+      bu_name: name,
+      bu_code: code,
+      send_welcome_email: sendWelcome,
+    };
+    if (adminEmail) {
+      payload.admin_email = adminEmail;
+      payload.admin_full_name = adminFullName || undefined;
+      payload.admin_role = adminRole;
+    }
+
+    const result = await api("/admin/business-units", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+
+    let msg = `BU "${result.bu.name}" (${result.bu.code}) creada.`;
+    if (result.user_created) {
+      msg += ` Usuario ${result.user_email} creado${sendWelcome ? " y email de bienvenida enviado" : ""}.`;
+    } else if (adminEmail && !result.user_created) {
+      msg += ` Usuario ${adminEmail} (ya existente) asignado a la BU.`;
+    }
+
+    setMessage("adminMessage", msg, "success");
+
+    // Clear form
+    if (el("adminBuName")) el("adminBuName").value = "";
+    if (el("adminBuCode")) el("adminBuCode").value = "";
+    if (el("adminUserEmail")) el("adminUserEmail").value = "";
+    if (el("adminUserFullName")) el("adminUserFullName").value = "";
+
+    // Reload BU list and global BU switcher
+    await loadAdminBus();
+    await loadBusinessUnits();
+  } catch (error) {
+    setMessage("adminMessage", `Error: ${error.message}`, "error");
+  }
 }
 
 async function bootstrap() {

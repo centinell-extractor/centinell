@@ -15,7 +15,7 @@ from app.db.connection import get_db
 from app.db.models import BusinessUnit, PasswordResetToken, RefreshToken, User, UserBUAccess
 from app.rate_limit import limiter
 from app.dependencies.auth import get_current_user
-from app.schemas.auth import LoginRequest, LoginResponse, RefreshRequest, UserPublic, TokenResponse
+from app.schemas.auth import ChangePasswordRequest, LoginRequest, LoginResponse, RefreshRequest, UserPublic, TokenResponse
 from app.services.audit import log_audit_event
 from app.services.email import send_password_reset_email
 from app.services.security import (
@@ -129,7 +129,13 @@ async def login(request: Request, payload: LoginRequest, response: Response, db:
         access_token=access_token,
         refresh_token=refresh_token,
         expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        user=UserPublic(id=user.id, email=user.email, full_name=user.full_name, role=role),
+        user=UserPublic(
+            id=user.id,
+            email=user.email,
+            full_name=user.full_name,
+            role=role,
+            must_change_password=bool(user.must_change_password),
+        ),
     )
 
 
@@ -200,7 +206,13 @@ async def refresh(
 
     return LoginResponse(
         expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        user=UserPublic(id=user.id, email=user.email, full_name=user.full_name, role=role),
+        user=UserPublic(
+            id=user.id,
+            email=user.email,
+            full_name=user.full_name,
+            role=role,
+            must_change_password=bool(user.must_change_password),
+        ),
     )
 
 
@@ -325,6 +337,7 @@ async def reset_password(
         .values(revoked_at=now)
     )
 
+    user.must_change_password = False
     await log_audit_event(
         db,
         event_type="auth.password_reset",
@@ -332,5 +345,48 @@ async def reset_password(
         resource_type="user",
         resource_id=str(user.id),
         message="Contraseña restablecida mediante token de recuperación",
+    )
+    await db.commit()
+
+
+@router.post("/change-password", status_code=204)
+async def change_password(
+    payload: ChangePasswordRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Cambio de contraseña para usuario autenticado.
+
+    Si must_change_password=True (primer login), no se exige la contraseña actual.
+    En caso contrario, se valida la contraseña actual antes de cambiarla.
+    """
+    if len(payload.new_password) < 8:
+        raise HTTPException(status_code=422, detail="La contraseña debe tener al menos 8 caracteres")
+
+    if not current_user.must_change_password:
+        if not payload.current_password:
+            raise HTTPException(status_code=422, detail="Se requiere la contraseña actual")
+        if not verify_password(payload.current_password, current_user.password_hash):
+            raise HTTPException(status_code=401, detail="Contraseña actual incorrecta")
+
+    now = utcnow()
+    current_user.password_hash = hash_password(payload.new_password)
+    current_user.must_change_password = False
+    db.add(current_user)
+
+    # Revoca sesiones activas para forzar nuevo login con nueva contraseña
+    await db.execute(
+        update(RefreshToken)
+        .where(RefreshToken.user_id == current_user.id, RefreshToken.revoked_at.is_(None))
+        .values(revoked_at=now)
+    )
+
+    await log_audit_event(
+        db,
+        event_type="auth.password_changed",
+        actor_user_id=current_user.id,
+        resource_type="user",
+        resource_id=str(current_user.id),
+        message="Contraseña cambiada por el usuario",
     )
     await db.commit()
