@@ -595,6 +595,8 @@ def _pdf_has_embedded_images(content: bytes) -> bool:
 
 def _encode_page_to_b64(image) -> str:
     import base64
+    if image.mode not in ("RGB", "L"):
+        image = image.convert("RGB")
     buf = BytesIO()
     image.save(buf, format="JPEG", quality=85)
     return base64.b64encode(buf.getvalue()).decode()
@@ -682,10 +684,11 @@ async def _extract_image_text_vision(content: bytes) -> str:
     """
     Extrae texto de una imagen (jpg/png/...) usando GPT-4o Vision.
     """
-    import base64
     import httpx
+    from PIL import Image, ImageOps
 
-    b64 = base64.b64encode(content).decode()
+    image = ImageOps.exif_transpose(Image.open(BytesIO(content)))
+    b64 = await asyncio.to_thread(_encode_page_to_b64, image)
     api_headers = {
         "Authorization": f"Bearer {OPENAI_API_KEY}",
         "Content-Type": "application/json",
@@ -742,7 +745,7 @@ def _extract_image_text_ocr(content: bytes) -> str:
         pytesseract.pytesseract.tesseract_cmd = TESSERACT_CMD
 
     try:
-        image = Image.open(BytesIO(content))
+        image = ImageOps.exif_transpose(Image.open(BytesIO(content)))
     except Exception as exc:
         raise HTTPException(
             status_code=400,
