@@ -43,7 +43,7 @@ RUN mkdir -p storage/documents
 RUN useradd -m -u 1001 centinell && chown -R centinell:centinell /app
 USER centinell
 
-EXPOSE 8000
+EXPOSE 8001
 
 # Arranque: migraciones + servidor
-CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8001}"]

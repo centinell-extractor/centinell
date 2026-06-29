@@ -60,8 +60,7 @@ async def _grant_bu_access(
         await session.commit()
 
 
-async def _create_prompt_config(
-    session_maker: async_sessionmaker[AsyncSession],
+
     *,
     bu_id,
     name: str,
@@ -156,6 +155,8 @@ async def _create_extraction(
         await session.commit()
         await session.refresh(ext)
         return ext
+
+
 
 
 @pytest.mark.asyncio

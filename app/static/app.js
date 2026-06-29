@@ -17,6 +17,8 @@ const state = {
   documentHighlightTerm: null,
   usersAdminByUserId: {},
   confirmModalResolver: null,
+  authGeneration: 0,
+  deletingConfigInFlight: false,
 };
 
 // Map view names ↔ URL paths. "run" lives at "/" to keep the root clean.
@@ -1306,6 +1308,7 @@ async function login(event) {
     });
 
     state.currentUser = result.user || null;
+    state.authGeneration += 1;
     persistSession();
 
     // First-login: must change password before accessing the app
@@ -1349,6 +1352,7 @@ async function logout() {
   state.currentUser = null;
   state.selectedBuId = null;
   state.businessUnits = [];
+  state.authGeneration += 1;
   persistSession();
   renderBuOptions();
   updateAuthUi();
@@ -1575,6 +1579,7 @@ function renderPromptPreview() {
 
 async function api(path, options = {}) {
   const { _skipAuthRetry, ...requestOptions } = options;
+  const requestAuthGeneration = state.authGeneration;
   const headers = options.headers ? { ...options.headers } : {};
   const isFormData = requestOptions.body instanceof FormData;
 
@@ -1595,6 +1600,15 @@ async function api(path, options = {}) {
   if (response.status === 401 && !path.startsWith("/auth/") && !_skipAuthRetry) {
     const refreshed = await refreshAccessToken();
     if (refreshed) {
+      return api(path, {
+        ...requestOptions,
+        _skipAuthRetry: true,
+      });
+    }
+
+    // Si la sesion cambio mientras esta request estaba en vuelo, reintentar una vez
+    // y evitar forzar logout por una respuesta 401 obsoleta.
+    if (requestAuthGeneration !== state.authGeneration) {
       return api(path, {
         ...requestOptions,
         _skipAuthRetry: true,
@@ -1648,6 +1662,7 @@ async function refreshAccessToken() {
       const result = await response.json();
       if (result.user) {
         state.currentUser = result.user;
+        state.authGeneration += 1;
         persistSession();
       }
       return Boolean(result.user);
@@ -1667,6 +1682,7 @@ Object.assign(state, {
   assessments: [],
   assessConfigsDraft: [],   // [{config_id, config_name}] in order
   editingAssessmentId: null,
+  assessDetailHistoryReqSeq: 0,
 });
 
 async function loadAssessments() {
@@ -1817,18 +1833,40 @@ function _populateDetailDocSelect() {
 async function _loadAssessmentDetailHistory(assessId) {
   const container = el("assessDetailHistory");
   if (!container) return;
+
+  // Secuencia para ignorar respuestas antiguas cuando cambia de evaluación/BU.
+  const reqSeq = ++state.assessDetailHistoryReqSeq;
+  const buAtRequest = state.selectedBuId;
+
   container.innerHTML = '<p class="empty-row">Cargando...</p>';
   try {
     const runs = await api(`/assessments/${assessId}/runs?limit=30`);
-    _renderDetailHistory(runs);
+
+    if (
+      reqSeq !== state.assessDetailHistoryReqSeq ||
+      state.currentAssessId !== assessId ||
+      state.selectedBuId !== buAtRequest
+    ) {
+      return;
+    }
+
+    _renderDetailHistory(runs, assessId);
   } catch (_) {
+    if (
+      reqSeq !== state.assessDetailHistoryReqSeq ||
+      state.currentAssessId !== assessId ||
+      state.selectedBuId !== buAtRequest
+    ) {
+      return;
+    }
     container.innerHTML = '<p class="empty-row">Error cargando historial</p>';
   }
 }
 
-function _renderDetailHistory(runs) {
+function _renderDetailHistory(runs, assessId) {
   const container = el("assessDetailHistory");
   if (!container) return;
+  if (assessId && state.currentAssessId !== assessId) return;
   if (!runs.length) {
     container.innerHTML = '<p class="empty-row">Sin ejecuciones todavía</p>';
     return;
@@ -3556,6 +3594,10 @@ function loadSelectedConfigToEditor(configIdOverride) {
     : [];
   renderVariablesDraft();
   clearVariableInputs();
+  const canManage = canManagePromptConfigs();
+  if (el("createConfigBtn")) el("createConfigBtn").style.display = canManage ? "" : "none";
+  if (el("updateConfigBtn")) el("updateConfigBtn").style.display = canManage ? "" : "none";
+  if (el("deleteConfigBtn")) el("deleteConfigBtn").style.display = canManage ? "" : "none";
   renderPromptPreview();
   setMessage("configMessage", `Configuración cargada para edicion: ${config.id}`, "success");
 }
@@ -3576,6 +3618,10 @@ function clearConfigEditor(options = {}) {
   _updateTemperatureVisibility("gpt-4o");
   clearVariableInputs();
   renderVariablesDraft();
+  const canManage = canManagePromptConfigs();
+  if (el("createConfigBtn")) el("createConfigBtn").style.display = canManage ? "" : "none";
+  if (el("updateConfigBtn")) el("updateConfigBtn").style.display = "none";
+  if (el("deleteConfigBtn")) el("deleteConfigBtn").style.display = "none";
   renderPromptPreview();
   if (!silent) {
     setMessage("configMessage", "Editor limpio. Listo para nueva configuración", "idle");
@@ -4245,6 +4291,53 @@ async function updateConfig() {
   }
 }
 
+async function deleteConfig() {
+  if (state.deletingConfigInFlight) {
+    return;
+  }
+
+  try {
+    ensureSessionAndBu();
+  } catch (error) {
+    setMessage("configMessage", error.message, "error");
+    return;
+  }
+
+  if (!canManagePromptConfigs()) {
+    setMessage("configMessage", "No tienes permisos para eliminar prompts", "error");
+    return;
+  }
+
+  if (!state.editingConfigId) {
+    setMessage("configMessage", "Carga una configuración existente en el editor", "error");
+    return;
+  }
+
+  const name = (el("cfgName")?.value || "").trim() || "este prompt";
+  const confirmed = await openConfirmModal({
+    title: "Eliminar prompt",
+    message: `¿Eliminar \"${name}\"? Esta accion no se puede deshacer.`,
+    acceptLabel: "Eliminar",
+    cancelLabel: "Cancelar",
+  });
+  if (!confirmed) return;
+
+  try {
+    state.deletingConfigInFlight = true;
+    if (el("deleteConfigBtn")) el("deleteConfigBtn").disabled = true;
+    await api(`/prompt-configs/${state.editingConfigId}`, { method: "DELETE" });
+    setMessage("configMessage", "Prompt eliminado", "success");
+    await loadConfigs();
+    clearConfigEditor({ silent: true });
+    activateView("configs", "replace");
+  } catch (error) {
+    setMessage("configMessage", `Error: ${error.message}`, "error");
+  } finally {
+    state.deletingConfigInFlight = false;
+    if (el("deleteConfigBtn")) el("deleteConfigBtn").disabled = false;
+  }
+}
+
 function populateCopyToBuSelect() {
   const sel = el("copyToBuSelect");
   if (!sel) return;
@@ -4904,10 +4997,14 @@ function wireActions() {
     state.docsTotal = 0;
     state.docsOffset = 0;
 
+    // Limpiar estado del BU anterior de forma inmediata para evitar que datos
+    // del BU saliente sean visibles mientras carga el BU entrante.
+    state.configsById = {};
+    state.assessments = [];
+    state.currentAssessId = null;
+
     // Siempre volver a /docs al cambiar de BU
     activateView("documents", "replace");
-
-    state.currentAssessId = null;
 
     await loadConfigs();
     await loadHistory();
@@ -4949,6 +5046,10 @@ function wireActions() {
   on("cancelVariableEditBtn", "click", cancelVariableEdit);
   on("createConfigBtn", "click", createConfig);
   on("updateConfigBtn", "click", updateConfig);
+  on("deleteConfigBtn", "click", (event) => {
+    event.preventDefault();
+    deleteConfig();
+  });
   on("copyToBuBtn", "click", copyConfigToBu);
   on("docDetailBackBtn", "click", () => activateView("documents", "push"));
   on("docDetailRunBtn", "click", runAssessmentFromDetail);
@@ -5104,6 +5205,15 @@ function wireActions() {
     if (!el("accountMenu")?.contains(e.target)) {
       closeAccountDropdown();
     }
+  });
+
+  // Fallback robusto: si por cualquier motivo no quedo enlazado el handler directo,
+  // este delegado mantiene funcional el boton de eliminar prompt.
+  document.addEventListener("click", (event) => {
+    const btn = event.target?.closest?.("#deleteConfigBtn");
+    if (!btn) return;
+    event.preventDefault();
+    deleteConfig();
   });
 
   on("accountSettingsBtn", "click", () => { closeAccountDropdown(); openAccountSettings(); });

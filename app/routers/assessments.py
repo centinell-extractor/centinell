@@ -497,6 +497,15 @@ async def list_assessment_runs(
     db: AsyncSession = Depends(get_db),
     auth: AuthContext = Depends(get_bu_auth_context),
 ):
+    assessment_exists = await db.execute(
+        select(Assessment.id).where(
+            Assessment.id == assessment_id,
+            Assessment.bu_id == auth.bu_id,
+        )
+    )
+    if not assessment_exists.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="Evaluacion no encontrada")
+
     result = await db.execute(
         select(AssessmentRun)
         .where(AssessmentRun.assessment_id == assessment_id, AssessmentRun.bu_id == auth.bu_id)

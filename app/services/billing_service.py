@@ -122,6 +122,10 @@ async def check_quota(
         current = usage["docs_uploaded"]
         limit = plan.max_docs_per_month
 
+        # limit None = plan sin tope (p.ej. enterprise)
+        if limit is None:
+            return True, overage_cost_cents, warning
+
         # Verificar overage (ya alcanzó el límite)
         if current >= limit:
             if not plan.allow_overage:
@@ -169,6 +173,10 @@ async def check_quota(
     elif action_type == "extraction.run":
         current = usage["extractions_run"]
         limit = plan.max_extractions_per_month
+
+        # limit None = plan sin tope (p.ej. enterprise)
+        if limit is None:
+            return True, overage_cost_cents, warning
 
         # Verificar overage
         if current >= limit:

@@ -2658,14 +2658,14 @@ tbody tr:hover { background: #f8f9fd; }
 .apikey-new-key-box {
   margin-top: 1rem;
   padding: 1rem;
-  background: var(--success-bg, #d4edda);
-  border: 1px solid var(--success-border, #28a745);
+  background: var(--ok-soft);
+  border: 1px solid var(--ok-border);
   border-radius: var(--radius);
 }
 .apikey-warning {
   font-size: 0.875rem;
   font-weight: 600;
-  color: var(--success-text, #155724);
+  color: var(--ok);
   margin: 0 0 0.5rem;
 }
 .apikey-copy-row {
@@ -2680,7 +2680,8 @@ tbody tr:hover { background: #f8f9fd; }
   word-break: break-all;
   flex: 1;
   padding: 0.4rem 0.6rem;
-  background: var(--surface-0);
+  background: var(--surface);
+  color: var(--text-1);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm, 4px);
 }

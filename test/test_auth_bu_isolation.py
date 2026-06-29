@@ -253,6 +253,111 @@ async def test_bu_admin_can_create_prompt_config(client, session_maker):
 
 
 @pytest.mark.asyncio
+async def test_bu_admin_can_delete_prompt_config(client, session_maker):
+    user = await _create_user(session_maker, email="buadmin-delete-prompt@test.local")
+    bu = await _create_bu(session_maker, name="BU Admin Delete Prompt", code=f"DP_{uuid4().hex[:6]}")
+    await _grant_bu_access(session_maker, user_id=user.id, bu_id=bu.id, role="bu_admin")
+
+    token = create_access_token(subject=str(user.id), role="bu_user", expires_minutes=30)
+    payload = {
+        "name": "Config eliminable",
+        "description": "Debe poder eliminarse",
+        "base_prompt": "Extrae {{VARIABLE_BLOCK}}",
+        "variables": [
+            {
+                "name": "campo",
+                "description": "Campo",
+                "required": True,
+                "type": "string",
+            }
+        ],
+        "model": "gpt-4o",
+        "temperature": 0,
+    }
+
+    created = await client.post(
+        "/prompt-configs/",
+        headers={
+            **_bearer(token),
+            "X-BU-ID": str(bu.id),
+            "Content-Type": "application/json",
+        },
+        json=payload,
+    )
+    assert created.status_code == 201
+    config_id = created.json()["id"]
+
+    deleted = await client.delete(
+        f"/prompt-configs/{config_id}",
+        headers={
+            **_bearer(token),
+            "X-BU-ID": str(bu.id),
+        },
+    )
+    assert deleted.status_code == 204
+
+    listed = await client.get(
+        "/prompt-configs/",
+        headers={
+            **_bearer(token),
+            "X-BU-ID": str(bu.id),
+        },
+    )
+    assert listed.status_code == 200
+    assert listed.json() == []
+
+
+@pytest.mark.asyncio
+async def test_bu_user_cannot_delete_prompt_config(client, session_maker):
+    admin_user = await _create_user(session_maker, email="admin-create-delete-denied@test.local")
+    normal_user = await _create_user(session_maker, email="buuser-delete-prompt@test.local")
+    bu = await _create_bu(session_maker, name="BU Delete Prompt Denied", code=f"DD_{uuid4().hex[:6]}")
+    await _grant_bu_access(session_maker, user_id=admin_user.id, bu_id=bu.id, role="bu_admin")
+    await _grant_bu_access(session_maker, user_id=normal_user.id, bu_id=bu.id, role="bu_user")
+
+    admin_token = create_access_token(subject=str(admin_user.id), role="bu_user", expires_minutes=30)
+    user_token = create_access_token(subject=str(normal_user.id), role="bu_user", expires_minutes=30)
+
+    payload = {
+        "name": "Config protegida",
+        "description": "No debería poder borrarla bu_user",
+        "base_prompt": "Extrae {{VARIABLE_BLOCK}}",
+        "variables": [
+            {
+                "name": "campo",
+                "description": "Campo",
+                "required": True,
+                "type": "string",
+            }
+        ],
+        "model": "gpt-4o",
+        "temperature": 0,
+    }
+
+    created = await client.post(
+        "/prompt-configs/",
+        headers={
+            **_bearer(admin_token),
+            "X-BU-ID": str(bu.id),
+            "Content-Type": "application/json",
+        },
+        json=payload,
+    )
+    assert created.status_code == 201
+    config_id = created.json()["id"]
+
+    deleted = await client.delete(
+        f"/prompt-configs/{config_id}",
+        headers={
+            **_bearer(user_token),
+            "X-BU-ID": str(bu.id),
+        },
+    )
+    assert deleted.status_code == 403
+    assert deleted.json()["detail"] == "No tienes permisos para configurar prompts en esta BU"
+
+
+@pytest.mark.asyncio
 async def test_bu_viewer_cannot_upload_document(client, session_maker):
     user = await _create_user(session_maker, email="viewer-upload@test.local")
     bu = await _create_bu(session_maker, name="Viewer Upload", code=f"VU_{uuid4().hex[:6]}")

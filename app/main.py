@@ -135,6 +135,11 @@ app.include_router(webhooks.router)
 
 @app.get("/")
 async def root():
+    return FileResponse(static_dir / "landing.html", media_type="text/html; charset=utf-8")
+
+
+@app.get("/app")
+async def console():
     return FileResponse(static_dir / "index.html", media_type="text/html; charset=utf-8")
 
 

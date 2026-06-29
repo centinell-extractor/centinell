@@ -154,7 +154,10 @@ async def list_prompt_configs(
     try:
         stmt = (
             select(PromptConfig)
-            .where(PromptConfig.bu_id == auth.bu_id)
+            .where(
+                PromptConfig.bu_id == auth.bu_id,
+                PromptConfig.is_active.is_(True),
+            )
             .order_by(desc(PromptConfig.created_at))
             .offset(skip)
             .limit(limit)
@@ -168,6 +171,39 @@ async def list_prompt_configs(
             status_code=500,
             detail=f"Error interno: {str(exc)}"
         )
+
+
+@router.delete("/{config_id}", status_code=204)
+async def delete_prompt_config(
+    config_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    auth: AuthContext = Depends(get_bu_auth_context),
+):
+    await require_bu_roles_with_audit(
+        auth,
+        {"admin_global", "bu_admin"},
+        "No tienes permisos para configurar prompts en esta BU",
+        db,
+        action="prompt_config.delete",
+        resource_type="prompt_config",
+        resource_id=str(config_id),
+    )
+
+    result = await db.execute(
+        select(PromptConfig).where(
+            PromptConfig.id == config_id,
+            PromptConfig.bu_id == auth.bu_id,
+            PromptConfig.is_active.is_(True),
+        )
+    )
+    prompt_config = result.scalars().first()
+
+    if not prompt_config:
+        raise HTTPException(status_code=404, detail="Configuración no encontrada")
+
+    prompt_config.is_active = False
+    db.add(prompt_config)
+    await db.commit()
 
 
 @router.patch("/{config_id}", response_model=PromptConfigRead)
@@ -265,11 +301,15 @@ async def copy_prompt_config_to_bu(
     )
 
     result = await db.execute(
-        select(PromptConfig).where(PromptConfig.id == config_id, PromptConfig.is_active.is_(True))
+        select(PromptConfig).where(
+            PromptConfig.id == config_id,
+            PromptConfig.bu_id == auth.bu_id,
+            PromptConfig.is_active.is_(True),
+        )
     )
     source = result.scalars().first()
     if not source:
-        raise HTTPException(status_code=404, detail="Configuracion origen no encontrada")
+        raise HTTPException(status_code=404, detail="Configuracion origen no encontrada o no pertenece a esta BU")
 
     target_bu = await db.get(BusinessUnit, target_bu_id)
     if not target_bu or not target_bu.is_active:

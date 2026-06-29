@@ -210,6 +210,18 @@ async def _run_ocr_background(document_id: UUID, content: bytes, filename: str) 
                                 text = native_text
                     elif suffix == ".docx":
                         text = await asyncio.to_thread(_extract_docx_text, content)
+                    elif suffix in {".jpg", ".jpeg", ".png"}:
+                        if OCR_USE_VISION_API:
+                            try:
+                                text = await asyncio.wait_for(
+                                    _extract_image_text_vision(content),
+                                    timeout=max(30, OCR_TIMEOUT_SECONDS),
+                                )
+                            except Exception as ocr_err:
+                                logger.warning("Vision OCR fallo para %s: %s", filename, ocr_err)
+                                text = await asyncio.to_thread(_extract_image_text_ocr, content)
+                        else:
+                            text = await asyncio.to_thread(_extract_image_text_ocr, content)
                     else:
                         raise ValueError(f"Formato no soportado: {suffix}")
 
@@ -666,6 +678,81 @@ async def _extract_pdf_pages_vision(content: bytes) -> list[str]:
     return list(results)
 
 
+async def _extract_image_text_vision(content: bytes) -> str:
+    """
+    Extrae texto de una imagen (jpg/png/...) usando GPT-4o Vision.
+    """
+    import base64
+    import httpx
+
+    b64 = base64.b64encode(content).decode()
+    api_headers = {
+        "Authorization": f"Bearer {OPENAI_API_KEY}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "model": "gpt-4o",
+        "max_tokens": 2048,
+        "messages": [{
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": (
+                        "Extrae todo el texto visible en esta imagen de documento. "
+                        "Incluye todos los campos: nombres, fechas, importes, NIFs/CIFs, "
+                        "direcciones y cualquier texto en márgenes o pies de página. "
+                        "Devuelve SOLO el texto extraído, sin explicaciones."
+                    ),
+                },
+                {
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/jpeg;base64,{b64}", "detail": "high"},
+                },
+            ],
+        }],
+    }
+    async with httpx.AsyncClient(timeout=90.0) as client:
+        resp = await client.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers=api_headers,
+            json=payload,
+        )
+        resp.raise_for_status()
+        return (resp.json()["choices"][0]["message"]["content"] or "").strip()
+
+
+def _extract_image_text_ocr(content: bytes) -> str:
+    """
+    Extrae texto de una imagen (jpg/png/...) usando Tesseract.
+    """
+    try:
+        from PIL import Image, ImageFilter, ImageOps
+        import pytesseract
+    except ImportError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "OCR no disponible. Instala dependencias Python: "
+                "pip install pytesseract pillow"
+            ),
+        ) from exc
+
+    if TESSERACT_CMD:
+        pytesseract.pytesseract.tesseract_cmd = TESSERACT_CMD
+
+    try:
+        image = Image.open(BytesIO(content))
+    except Exception as exc:
+        raise HTTPException(
+            status_code=400,
+            detail="No se pudo leer la imagen para OCR.",
+        ) from exc
+
+    variants = _build_ocr_images(image, ImageOps, ImageFilter)
+    return _ocr_best_text_for_page(variants, pytesseract)
+
+
 def _extract_pdf_text_ocr_pages(content: bytes) -> list[str]:
     """
     Extrae texto OCR por página para comparar contra extracción nativa página a página.
@@ -859,7 +946,7 @@ async def parse_document(
 ):
     """
     Recibe un archivo y devuelve texto plano para reutilizarlo en /extract.
-    Soporta txt/md/json/csv/xml/html y, opcionalmente, pdf/docx.
+    Soporta txt/md/json/csv/xml/html y, opcionalmente, pdf/docx/jpg/jpeg/png.
     """
     await require_bu_roles_with_audit(
         auth,
@@ -971,11 +1058,30 @@ async def parse_document(
                         raise
         elif suffix == ".docx":
             text = _extract_docx_text(content)
+        elif suffix in {".jpg", ".jpeg", ".png"}:
+            if OCR_USE_VISION_API:
+                try:
+                    text = await asyncio.wait_for(
+                        _extract_image_text_vision(content),
+                        timeout=max(30, OCR_TIMEOUT_SECONDS),
+                    )
+                except (asyncio.TimeoutError, HTTPException) as exc:
+                    logger.warning("Vision OCR fallido para imagen %s: %s", filename, exc)
+                    text = await asyncio.to_thread(_extract_image_text_ocr, content)
+                    used_ocr = True
+                    ocr_warning = (
+                        "Vision API no disponible; se uso OCR con Tesseract."
+                    )
+                else:
+                    used_ocr = True
+            else:
+                text = await asyncio.to_thread(_extract_image_text_ocr, content)
+                used_ocr = True
         else:
             raise HTTPException(
                 status_code=400,
                 detail=(
-                    "Formato no soportado. Usa txt, md, json, csv, xml, html, pdf o docx"
+                    "Formato no soportado. Usa txt, md, json, csv, xml, html, pdf, docx, jpg, jpeg o png"
                 ),
             )
 

@@ -1,0 +1,1015 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Centinell — Extracción inteligente de datos desde documentos</title>
+  <meta name="description" content="Centinell usa IA para convertir facturas, contratos e informes en datos estructurados y exportables. Sin código, sin errores manuales. Integra con tu sistema en minutos.">
+  <meta name="keywords" content="extracción de datos, inteligencia artificial, documentos, facturas, contratos, automatización, OCR, API">
+  <meta property="og:title" content="Centinell — Extracción inteligente de datos desde documentos">
+  <meta property="og:description" content="Convierte facturas, contratos e informes en datos limpios y exportables con IA. Sin código, sin errores manuales.">
+  <meta property="og:type" content="website">
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --brand:       #7c3aed;
+      --brand-light: #a78bfa;
+      --brand-dim:   rgba(124, 58, 237, 0.15);
+      --teal:        #0d9488;
+      --teal-light:  #5eead4;
+      --dark-bg:     #080a12;
+      --dark-card:   #0f1221;
+      --dark-border: rgba(255,255,255,0.08);
+      --light-bg:    #f5f6fb;
+      --white:       #ffffff;
+      --text-hero:   #f0f2fa;
+      --text-muted:  #8892b0;
+      --text-body:   #374161;
+      --text-heading:#111827;
+      --font:        -apple-system, BlinkMacSystemFont, "Aptos", "Segoe UI Variable", "Segoe UI", Roboto, sans-serif;
+      --mono:        "IBM Plex Mono", "Cascadia Code", "Consolas", monospace;
+      --r:           10px;
+      --r-lg:        16px;
+      --r-xl:        24px;
+      --shadow-md:   0 8px 24px rgba(0,0,0,0.10);
+      --shadow-lg:   0 20px 48px rgba(0,0,0,0.14);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--font);
+      font-size: 1rem;
+      line-height: 1.6;
+      color: var(--text-body);
+      background: var(--white);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Nav ─────────────────────────────────────────────────── */
+    .nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 2rem;
+      height: 64px;
+      background: rgba(8, 10, 18, 0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--dark-border);
+    }
+
+    .nav-logo {
+      font-size: 1.25rem;
+      font-weight: 800;
+      letter-spacing: 0.18em;
+      color: var(--text-hero);
+      text-decoration: none;
+    }
+    .nav-logo span { color: var(--brand-light); }
+
+    .nav-actions { display: flex; gap: 0.75rem; align-items: center; }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.55rem 1.2rem;
+      border-radius: var(--r);
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      border: none;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+    }
+    .btn-ghost {
+      background: transparent;
+      color: var(--text-muted);
+      border: 1px solid var(--dark-border);
+    }
+    .btn-ghost:hover { background: rgba(255,255,255,0.06); color: var(--text-hero); }
+
+    .btn-primary {
+      background: var(--brand);
+      color: #fff;
+    }
+    .btn-primary:hover { background: #6d28d9; transform: translateY(-1px); box-shadow: 0 4px 16px rgba(124,58,237,0.4); }
+
+    .btn-primary-lg {
+      padding: 0.8rem 2rem;
+      font-size: 1rem;
+      border-radius: var(--r-lg);
+    }
+    .btn-outline-lg {
+      padding: 0.8rem 2rem;
+      font-size: 1rem;
+      border-radius: var(--r-lg);
+      background: transparent;
+      color: var(--text-hero);
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+    .btn-outline-lg:hover { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.35); }
+
+    /* ── Hero ─────────────────────────────────────────────────── */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 8rem 2rem 6rem;
+      background: var(--dark-bg);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 80% 50% at 50% -10%, rgba(124, 58, 237, 0.22) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 40% at 80% 100%, rgba(13, 148, 136, 0.12) 0%, transparent 50%);
+      pointer-events: none;
+    }
+
+    /* subtle grid */
+    .hero::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+      background-size: 48px 48px;
+      pointer-events: none;
+    }
+
+    .hero-inner { position: relative; z-index: 1; max-width: 820px; }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: rgba(124, 58, 237, 0.15);
+      border: 1px solid rgba(124, 58, 237, 0.35);
+      color: var(--brand-light);
+      padding: 0.3rem 0.9rem;
+      border-radius: 100px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-bottom: 2rem;
+    }
+    .hero-badge-dot {
+      width: 6px; height: 6px;
+      background: var(--brand-light);
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.8); }
+    }
+
+    .hero h1 {
+      font-size: clamp(2.4rem, 5.5vw, 4.2rem);
+      font-weight: 800;
+      line-height: 1.1;
+      color: var(--text-hero);
+      letter-spacing: -0.03em;
+      margin-bottom: 1.5rem;
+    }
+
+    .hero h1 .accent {
+      background: linear-gradient(135deg, #a78bfa 0%, #60a5fa 60%, #5eead4 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero-sub {
+      font-size: clamp(1rem, 2vw, 1.2rem);
+      color: var(--text-muted);
+      max-width: 580px;
+      margin: 0 auto 2.5rem;
+      line-height: 1.65;
+    }
+
+    .hero-actions {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-bottom: 3.5rem;
+    }
+
+    .hero-social-proof {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      color: var(--text-muted);
+      font-size: 0.82rem;
+    }
+    .hero-social-proof-avatars {
+      display: flex;
+    }
+    .avatar-circle {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      border: 2px solid var(--dark-bg);
+      margin-left: -8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.65rem;
+      font-weight: 700;
+      color: white;
+    }
+    .avatar-circle:first-child { margin-left: 0; }
+    .av1 { background: #7c3aed; }
+    .av2 { background: #0d9488; }
+    .av3 { background: #1d4ed8; }
+    .av4 { background: #b45309; }
+
+    /* ── Stats strip ─────────────────────────────────────────── */
+    .stats {
+      background: #0d0f1e;
+      border-top: 1px solid var(--dark-border);
+      border-bottom: 1px solid var(--dark-border);
+      padding: 2rem 2rem;
+    }
+    .stats-inner {
+      max-width: 900px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1rem;
+      text-align: center;
+    }
+    .stat-item {}
+    .stat-value {
+      font-size: 2rem;
+      font-weight: 800;
+      color: var(--text-hero);
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+    }
+    .stat-value span { color: var(--brand-light); }
+    .stat-desc {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 0.2rem;
+    }
+
+    /* ── Section base ────────────────────────────────────────── */
+    .section { padding: 6rem 2rem; }
+    .section-inner { max-width: 1100px; margin: 0 auto; }
+    .section-tag {
+      display: inline-block;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--brand);
+      margin-bottom: 0.75rem;
+    }
+    .section-title {
+      font-size: clamp(1.8rem, 3.5vw, 2.8rem);
+      font-weight: 800;
+      color: var(--text-heading);
+      line-height: 1.15;
+      letter-spacing: -0.025em;
+      margin-bottom: 1rem;
+    }
+    .section-lead {
+      font-size: 1.05rem;
+      color: #5a6480;
+      max-width: 540px;
+      line-height: 1.65;
+    }
+    .section-header { margin-bottom: 3.5rem; }
+
+    /* ── Features ────────────────────────────────────────────── */
+    .features { background: var(--white); }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.5rem;
+    }
+
+    .feature-card {
+      background: var(--light-bg);
+      border: 1px solid #e5e8f0;
+      border-radius: var(--r-lg);
+      padding: 1.75rem;
+      transition: all 0.2s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    .feature-card:hover {
+      border-color: #c4b5fd;
+      box-shadow: 0 0 0 3px rgba(124,58,237,0.06), var(--shadow-md);
+      transform: translateY(-2px);
+    }
+    .feature-card::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--brand), transparent);
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .feature-card:hover::before { opacity: 1; }
+
+    .feature-icon {
+      width: 44px; height: 44px;
+      background: rgba(124,58,237,0.1);
+      border-radius: var(--r);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 1.1rem;
+    }
+    .feature-icon svg { width: 22px; height: 22px; fill: var(--brand); }
+
+    .feature-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text-heading);
+      margin-bottom: 0.5rem;
+    }
+    .feature-desc {
+      font-size: 0.875rem;
+      color: #5a6480;
+      line-height: 1.6;
+    }
+
+    /* ── Use cases ───────────────────────────────────────────── */
+    .usecases { background: #f8f9fc; }
+
+    .usecases-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.5rem;
+    }
+
+    .usecase-card {
+      background: var(--white);
+      border: 1px solid #e5e8f0;
+      border-radius: var(--r-lg);
+      padding: 2rem;
+      box-shadow: var(--shadow-md);
+    }
+
+    .usecase-sector {
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--teal);
+      margin-bottom: 0.5rem;
+    }
+    .usecase-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--text-heading);
+      margin-bottom: 0.75rem;
+    }
+    .usecase-desc {
+      font-size: 0.875rem;
+      color: #5a6480;
+      line-height: 1.6;
+      margin-bottom: 1.25rem;
+    }
+    .usecase-fields {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+    .usecase-field {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.8rem;
+      color: var(--text-body);
+    }
+    .usecase-field-dot {
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      background: var(--brand-light);
+      flex-shrink: 0;
+    }
+
+    /* ── How it works ────────────────────────────────────────── */
+    .howitworks { background: var(--white); }
+
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 2rem;
+      position: relative;
+    }
+
+    .steps::before {
+      content: "";
+      position: absolute;
+      top: 28px;
+      left: calc(16.66% + 28px);
+      right: calc(16.66% + 28px);
+      height: 1px;
+      background: linear-gradient(90deg, var(--brand), var(--brand-light), var(--teal-light));
+      opacity: 0.4;
+    }
+
+    .step { text-align: center; }
+
+    .step-number {
+      width: 56px; height: 56px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--brand), #6d28d9);
+      color: white;
+      font-size: 1.3rem;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 1.25rem;
+      box-shadow: 0 4px 16px rgba(124,58,237,0.35);
+    }
+
+    .step-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--text-heading);
+      margin-bottom: 0.5rem;
+    }
+    .step-desc {
+      font-size: 0.875rem;
+      color: #5a6480;
+      line-height: 1.6;
+    }
+
+    /* ── API section ─────────────────────────────────────────── */
+    .apisection {
+      background: var(--dark-bg);
+      position: relative;
+      overflow: hidden;
+    }
+    .apisection::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse 70% 60% at 60% 50%, rgba(13,148,136,0.08) 0%, transparent 60%);
+      pointer-events: none;
+    }
+
+    .apisection .section-tag { color: var(--teal-light); }
+    .apisection .section-title { color: var(--text-hero); }
+    .apisection .section-lead { color: var(--text-muted); }
+
+    .api-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4rem;
+      align-items: center;
+    }
+
+    .api-features { display: flex; flex-direction: column; gap: 1.5rem; }
+
+    .api-feature {
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+    }
+    .api-feature-icon {
+      width: 36px; height: 36px;
+      border-radius: 8px;
+      background: rgba(94, 234, 212, 0.12);
+      border: 1px solid rgba(94,234,212,0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .api-feature-icon svg { width: 18px; height: 18px; fill: var(--teal-light); }
+    .api-feature-title {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--text-hero);
+      margin-bottom: 0.2rem;
+    }
+    .api-feature-desc { font-size: 0.82rem; color: var(--text-muted); }
+
+    .terminal {
+      background: #0d1117;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: var(--r-xl);
+      overflow: hidden;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+    }
+    .terminal-bar {
+      background: #161b22;
+      padding: 0.75rem 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+    }
+    .terminal-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+    }
+    .td-red   { background: #ff5f57; }
+    .td-yellow{ background: #febc2e; }
+    .td-green { background: #28c840; }
+    .terminal-title {
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      color: rgba(255,255,255,0.3);
+      margin-left: 0.5rem;
+    }
+    .terminal-body {
+      padding: 1.5rem;
+      font-family: var(--mono);
+      font-size: 0.8rem;
+      line-height: 1.75;
+      color: #e6edf3;
+    }
+    .t-comment { color: #6e7681; }
+    .t-method  { color: #ff7b72; }
+    .t-path    { color: #79c0ff; }
+    .t-key     { color: #7ee787; }
+    .t-value   { color: #ffa657; }
+    .t-string  { color: #a5d6ff; }
+    .t-arrow   { color: var(--teal-light); }
+    .t-dim     { color: #484f58; }
+
+    /* ── Final CTA ───────────────────────────────────────────── */
+    .finalcta {
+      background: linear-gradient(135deg, #1e0b4b 0%, #0f0a2e 50%, #031a1a 100%);
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .finalcta::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse 80% 60% at 50% 50%, rgba(124,58,237,0.18) 0%, transparent 65%);
+      pointer-events: none;
+    }
+    .finalcta-inner { position: relative; z-index: 1; max-width: 640px; margin: 0 auto; }
+    .finalcta .section-title { color: var(--text-hero); }
+    .finalcta .section-lead { color: var(--text-muted); margin: 0 auto 2.5rem; max-width: 480px; }
+    .finalcta-actions { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+    .btn-cta-white {
+      padding: 0.8rem 2rem;
+      font-size: 1rem;
+      border-radius: var(--r-lg);
+      background: white;
+      color: var(--brand);
+      font-weight: 700;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      transition: all 0.15s ease;
+    }
+    .btn-cta-white:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(255,255,255,0.2); }
+
+    /* ── Footer ──────────────────────────────────────────────── */
+    footer {
+      background: #080a12;
+      border-top: 1px solid var(--dark-border);
+      padding: 2.5rem 2rem;
+    }
+    .footer-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+    .footer-logo {
+      font-size: 1rem;
+      font-weight: 800;
+      letter-spacing: 0.18em;
+      color: rgba(255,255,255,0.5);
+      text-decoration: none;
+    }
+    .footer-links { display: flex; gap: 2rem; }
+    .footer-link {
+      font-size: 0.82rem;
+      color: rgba(255,255,255,0.35);
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+    .footer-link:hover { color: rgba(255,255,255,0.7); }
+    .footer-copy { font-size: 0.75rem; color: rgba(255,255,255,0.2); }
+
+    /* ── Responsive ──────────────────────────────────────────── */
+    @media (max-width: 900px) {
+      .features-grid { grid-template-columns: repeat(2, 1fr); }
+      .usecases-grid { grid-template-columns: 1fr; }
+      .steps { grid-template-columns: 1fr; }
+      .steps::before { display: none; }
+      .api-layout { grid-template-columns: 1fr; }
+      .stats-inner { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    @media (max-width: 600px) {
+      .features-grid { grid-template-columns: 1fr; }
+      .nav { padding: 0 1.25rem; }
+      .section { padding: 4rem 1.25rem; }
+      .hero { padding: 6rem 1.25rem 4rem; }
+      .hero-actions { flex-direction: column; align-items: center; }
+      .nav-actions .btn-ghost { display: none; }
+      .footer-links { display: none; }
+      .stats-inner { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── Navbar ─────────────────────────────────────────────── -->
+  <nav class="nav">
+    <a href="/" class="nav-logo">CENTINELL<span>.</span></a>
+    <div class="nav-actions">
+      <a href="#features" class="btn btn-ghost">Características</a>
+      <a href="#usecases" class="btn btn-ghost">Casos de uso</a>
+      <a href="/app" class="btn btn-primary">Iniciar sesión</a>
+    </div>
+  </nav>
+
+  <!-- ── Hero ───────────────────────────────────────────────── -->
+  <section class="hero">
+    <div class="hero-inner">
+      <div class="hero-badge">
+        <div class="hero-badge-dot"></div>
+        Plataforma de extracción con IA
+      </div>
+
+      <h1>
+        Convierte documentos en<br>
+        <span class="accent">datos que trabajan</span>
+      </h1>
+
+      <p class="hero-sub">
+        Centinell extrae automáticamente los datos que necesitas de facturas,
+        contratos, informes y cualquier documento ¡sin importar su estructura! Preciso, auditable e integrable con tus sistemas
+        desde el primer día.
+      </p>
+
+      <div class="hero-actions">
+        <a href="mailto:info@centinell.io?subject=Solicitud%20de%20acceso" class="btn btn-primary btn-primary-lg">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4-8 5-8-5V6l8 5 8-5v2z"/></svg>
+          Solicita información
+        </a>
+        <a href="/app" class="btn-outline-lg btn">
+          Accede →
+        </a>
+      </div>
+
+      <div class="hero-social-proof">
+        <div class="hero-social-proof-avatars">
+          <div class="avatar-circle av1">RG</div>
+          <div class="avatar-circle av2">ML</div>
+          <div class="avatar-circle av3">AP</div>
+          <div class="avatar-circle av4">SN</div>
+        </div>
+        <span>Equipos de finanzas, legal y operaciones ya lo usan a diario</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Stats ──────────────────────────────────────────────── -->
+  <div class="stats">
+    <div class="stats-inner">
+      <div class="stat-item">
+        <div class="stat-value">&lt;<span>3</span>s</div>
+        <div class="stat-desc">por documento</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">&gt;<span>95</span>%</div>
+        <div class="stat-desc">precisión de extracción</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value"><span>100</span>+</div>
+        <div class="stat-desc">documentos en lote</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value"><span>1</span>clic</div>
+        <div class="stat-desc">para exportar a Excel</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Features ───────────────────────────────────────────── -->
+  <section class="section features" id="features">
+    <div class="section-inner">
+      <div class="section-header">
+        <span class="section-tag">Características</span>
+        <h2 class="section-title">Todo lo que necesita<br>tu equipo</h2>
+        <p class="section-lead">
+          Desde la extracción con IA hasta la validación humana y la integración con
+          tus sistemas — Centinell cubre el proceso de extremo a extremo.
+        </p>
+      </div>
+
+      <div class="features-grid">
+
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
+          </div>
+          <div class="feature-title">Extracción inteligente con IA</div>
+          <div class="feature-desc">Define los campos que necesitas una vez. Centinell los localiza y extrae en cualquier documento, sea cual sea su formato o estructura.</div>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24"><path d="M4 5h16v4H4V5zm0 5h16v4H4v-4zm0 5h16v4H4v-4z"/></svg>
+          </div>
+          <div class="feature-title">Procesamiento en lote</div>
+          <div class="feature-desc">Sube cientos de documentos en una colección y procésalos en paralelo. Exporta todos los resultados a Excel, CSV o JSON con un solo clic.</div>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>
+          </div>
+          <div class="feature-title">Validación y revisión humana</div>
+          <div class="feature-desc">Los casos con baja confianza llegan a una cola de revisión. Tu equipo valida con el documento visible al lado — trazabilidad completa.</div>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24"><path d="M13.5 3a10.5 10.5 0 1 0 7.4 17.9l-1.4-1.4A8.5 8.5 0 1 1 13.5 5V3zm7 5V3h-5l1.9 1.9-4.4 4.4 1.4 1.4 4.4-4.4L20.5 8z"/></svg>
+          </div>
+          <div class="feature-title">Webhooks y API REST</div>
+          <div class="feature-desc">Conecta Centinell con Power Automate, Zapier o tu propio sistema. Los resultados llegan firmados a tu endpoint en tiempo real.</div>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24"><path d="M12 2 4 5v6c0 5.55 3.84 10.74 8 12 4.16-1.26 8-6.45 8-12V5l-8-3zm0 2.18 6 2.25V11c0 4.53-3 8.93-6 10-3-1.07-6-5.47-6-10V6.43l6-2.25zm-1 3.82h2v6h-2V8zm0 7h2v2h-2v-2z"/></svg>
+          </div>
+          <div class="feature-title">Auditoría completa</div>
+          <div class="feature-desc">Cada acción queda registrada: quién procesó qué documento, cuándo y con qué resultado. Cumplimiento y trazabilidad listos para auditar.</div>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.79 2.99-4S17.66 3 16 3s-3 1.79-3 4 1.34 4 3 4zm-8 0c1.66 0 2.99-1.79 2.99-4S9.66 3 8 3 5 4.79 5 7s1.34 4 3 4zm0 2c-2.33 0-7 1.17-7 3.5V21h14v-4.5C15 14.17 10.33 13 8 13zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.98 1.97 3.45V21h6v-4.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+          </div>
+          <div class="feature-title">Multi-empresa y multi-equipo</div>
+          <div class="feature-desc">Aísla datos por departamento, cliente o proyecto con Business Units independientes. Control granular de roles y accesos por usuario.</div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Use cases ──────────────────────────────────────────── -->
+  <section class="section usecases" id="usecases">
+    <div class="section-inner">
+      <div class="section-header">
+        <span class="section-tag">Casos de uso</span>
+        <h2 class="section-title">Para cada tipo de documento<br>en tu empresa</h2>
+        <p class="section-lead">
+          Cualquier documento con estructura repetida es un candidato perfecto
+          para Centinell. Estos son los más frecuentes.
+        </p>
+      </div>
+
+      <div class="usecases-grid">
+
+        <div class="usecase-card">
+          <div class="usecase-sector">Finanzas y contabilidad</div>
+          <div class="usecase-title">Facturas de proveedores</div>
+          <div class="usecase-desc">
+            Elimina la entrada manual de facturas. Centinell extrae todos los
+            campos relevantes en segundos, listos para tu ERP o sistema contable.
+          </div>
+          <div class="usecase-fields">
+            <div class="usecase-field"><div class="usecase-field-dot"></div> NIF / CIF del proveedor</div>
+            <div class="usecase-field"><div class="usecase-field-dot"></div> Número de factura y fecha</div>
+            <div class="usecase-field"><div class="usecase-field-dot"></div> Base imponible, IVA y total</div>
+            <div class="usecase-field"><div class="usecase-field-dot"></div> Líneas de pedido y conceptos</div>
+            <div class="usecase-field"><div class="usecase-field-dot"></div> IBAN y condiciones de pago</div>
+          </div>
+        </div>
+
+        <div class="usecase-card">
+          <div class="usecase-sector">Legal y compliance</div>
+          <div class="usecase-title">Contratos y acuerdos</div>
+          <div class="usecase-desc">
+            Analiza contratos de proveedores, NDAs y acuerdos de servicio para
+            extraer cláusulas clave, fechas y condiciones relevantes.
+          </div>
+          <div class="usecase-fields">
+            <div class="usecase-field"><div class="usecase-field-dot"></div> Partes firmantes e identificadores</div>
+            <div class="usecase-field"><div class="usecase-field-dot"></div> Fecha de inicio y vigencia</div>
+            <div class="usecase-field"><div class="usecase-field-dot"></div> Importe y condiciones de renovación</div>
+            <div class="usecase-field"><div class="usecase-field-dot"></div> Penalizaciones y cláusulas clave</div>
+            <div class="usecase-field"><div class="usecase-field-dot"></div> Jurisdicción y ley aplicable</div>
+          </div>
+        </div>
+
+        <div class="usecase-card">
+          <div class="usecase-sector">Operaciones y RR.HH.</div>
+          <div class="usecase-title">Expedientes e informes</div>
+          <div class="usecase-desc">
+            Digitaliza expedientes históricos, informes de auditoría o CVs
+            y conviértelos en datos estructurados y consultables.
+          </div>
+          <div class="usecase-fields">
+            <div class="usecase-field"><div class="usecase-field-dot"></div> Datos de identificación</div>
+            <div class="usecase-field"><div class="usecase-field-dot"></div> Fechas y periodos relevantes</div>
+            <div class="usecase-field"><div class="usecase-field-dot"></div> Competencias y experiencia (CVs)</div>
+            <div class="usecase-field"><div class="usecase-field-dot"></div> Incidencias y resoluciones</div>
+            <div class="usecase-field"><div class="usecase-field-dot"></div> Cualquier campo personalizado</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ── How it works ───────────────────────────────────────── -->
+  <section class="section howitworks">
+    <div class="section-inner">
+      <div class="section-header" style="text-align:center; max-width:100%">
+        <span class="section-tag">Cómo funciona</span>
+        <h2 class="section-title">En tres pasos, sin código</h2>
+        <p class="section-lead" style="margin: 0 auto">
+          Configurar Centinell lleva minutos. No necesitas conocimientos técnicos
+          para empezar a extraer datos de tus documentos.
+        </p>
+      </div>
+
+      <div class="steps">
+        <div class="step">
+          <div class="step-number">1</div>
+          <div class="step-title">Define tus campos</div>
+          <div class="step-desc">
+            Crea un prompt con los campos que quieres extraer: nombre, importe,
+            fecha, NIF... Puedes usar lenguaje natural para describir cada campo.
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-number">2</div>
+          <div class="step-title">Sube tus documentos</div>
+          <div class="step-desc">
+            PDF, Word, imágenes escaneadas — Centinell los procesa todos con OCR
+            automático. Sube uno a uno o cientos en lote en el mismo paso.
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-number">3</div>
+          <div class="step-title">Exporta e integra</div>
+          <div class="step-desc">
+            Descarga los datos a Excel, CSV o JSON. O activa webhooks para que
+            los resultados lleguen directamente a tu sistema o flujo de trabajo.
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── API section ────────────────────────────────────────── -->
+  <section class="section apisection">
+    <div class="section-inner">
+      <div class="api-layout">
+        <div>
+          <span class="section-tag">Integraciones</span>
+          <h2 class="section-title" style="margin-bottom:1rem">Conecta con todo tu stack</h2>
+          <p class="section-lead" style="margin-bottom:2.5rem">
+            API REST documentada con autenticación por API Key.
+            Sin configuración compleja, sin dependencias de SDK.
+          </p>
+
+          <div class="api-features">
+            <div class="api-feature">
+              <div class="api-feature-icon">
+                <svg viewBox="0 0 24 24"><path d="M12.65 10A5.99 5.99 0 0 0 7 6a6 6 0 1 0 5.65 8H17v2h2v-2h2v-2h-8.35zM7 14c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4z"/></svg>
+              </div>
+              <div>
+                <div class="api-feature-title">API Keys por BU</div>
+                <div class="api-feature-desc">Crea claves con scope de BU y rol definido. Sin JWT, sin sesión.</div>
+              </div>
+            </div>
+
+            <div class="api-feature">
+              <div class="api-feature-icon">
+                <svg viewBox="0 0 24 24"><path d="M13.5 3a10.5 10.5 0 1 0 7.4 17.9l-1.4-1.4A8.5 8.5 0 1 1 13.5 5V3zm7 5V3h-5l1.9 1.9-4.4 4.4 1.4 1.4 4.4-4.4L20.5 8z"/></svg>
+              </div>
+              <div>
+                <div class="api-feature-title">Webhooks firmados con HMAC</div>
+                <div class="api-feature-desc">Recibe notificaciones en tiempo real con firma verificable en la cabecera.</div>
+              </div>
+            </div>
+
+            <div class="api-feature">
+              <div class="api-feature-icon">
+                <svg viewBox="0 0 24 24"><path d="M4 3h12l4 4v14H4V3zm12 1.5V8h3.5L16 4.5zM8 11h8v2H8v-2zm0 4h8v2H8v-2z"/></svg>
+              </div>
+              <div>
+                <div class="api-feature-title">Power Automate y Zapier</div>
+                <div class="api-feature-desc">Integra sin código con tus flujos de automatización favoritos.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="terminal">
+          <div class="terminal-bar">
+            <div class="terminal-dot td-red"></div>
+            <div class="terminal-dot td-yellow"></div>
+            <div class="terminal-dot td-green"></div>
+            <span class="terminal-title">centinell — api request</span>
+          </div>
+          <div class="terminal-body">
+<span class="t-comment"># Ejecutar extracción vía API</span>
+
+<span class="t-method">POST</span> <span class="t-path">/assessments/{id}/run</span>
+<span class="t-key">X-API-Key</span><span class="t-dim">:</span> <span class="t-string">cnt_xxxxxxxxxxxxxxxxxx</span>
+<span class="t-key">Content-Type</span><span class="t-dim">:</span> <span class="t-string">application/json</span>
+
+<span class="t-dim">{</span>
+  <span class="t-key">"document_id"</span><span class="t-dim">:</span> <span class="t-string">"fac-2026-05-0041"</span>
+<span class="t-dim">}</span>
+
+<span class="t-arrow">→ 200 OK</span> <span class="t-dim">en 2.3 segundos</span>
+
+<span class="t-dim">{</span>
+  <span class="t-key">"NIF_proveedor"</span><span class="t-dim">:</span>  <span class="t-string">"B-87654321"</span><span class="t-dim">,</span>
+  <span class="t-key">"total"</span><span class="t-dim">:</span>          <span class="t-value">14520.00</span><span class="t-dim">,</span>
+  <span class="t-key">"fecha_factura"</span><span class="t-dim">:</span>  <span class="t-string">"2026-05-15"</span><span class="t-dim">,</span>
+  <span class="t-key">"num_factura"</span><span class="t-dim">:</span>    <span class="t-string">"FAC-2026/0412"</span>
+<span class="t-dim">}</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Final CTA ──────────────────────────────────────────── -->
+  <section class="section finalcta">
+    <div class="section-inner">
+      <div class="finalcta-inner">
+        <h2 class="section-title" style="margin-bottom:1rem">
+          ¿Listo para automatizar<br>la extracción de datos?
+        </h2>
+        <p class="section-lead">
+          Solicita acceso y comienza a procesar tus documentos con IA en menos de un día.
+          Sin instalación, sin infraestructura propia.
+        </p>
+        <div class="finalcta-actions">
+          <a href="mailto:info@centinell.io?subject=Solicitud%20de%20acceso" class="btn-cta-white">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4-8 5-8-5V6l8 5 8-5v2z"/></svg>
+            Solicitar acceso
+          </a>
+          <a href="/app" class="btn-outline-lg btn">
+            Ya tengo cuenta →
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Footer ─────────────────────────────────────────────── -->
+  <footer>
+    <div class="footer-inner">
+      <a href="/" class="footer-logo">CENTINELL</a>
+      <div class="footer-links">
+        <a href="#features" class="footer-link">Características</a>
+        <a href="#usecases" class="footer-link">Casos de uso</a>
+        <a href="mailto:info@centinell.io" class="footer-link">Contacto</a>
+        <a href="/app" class="footer-link">Consola</a>
+      </div>
+      <span class="footer-copy">© 2026 Centinell</span>
+    </div>
+  </footer>
+
+</body>
+</html>

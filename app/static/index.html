@@ -4,7 +4,9 @@
   <meta charset="UTF-8">
   <meta name="content-type" content="text/html; charset=utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Centinell Console</title>
+  <title>Centinell Console — Extracción inteligente de datos</title>
+  <meta name="description" content="Consola de Centinell: extrae, valida y exporta datos de documentos con IA.">
+  <meta name="robots" content="noindex, nofollow">
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v=20260529a">
   <link rel="stylesheet" href="/static/styles.css?v=20260527f">
 </head>
@@ -203,10 +205,10 @@
             <div class="file-upload-row">
               <label for="documentFile">Subir archivo</label>
               <div class="file-upload-controls">
-                <input id="documentFile" type="file" accept=".txt,.md,.json,.csv,.xml,.html,.pdf,.docx">
+                <input id="documentFile" type="file" accept=".txt,.md,.json,.csv,.xml,.html,.pdf,.docx,.jpg,.jpeg,.png">
                 <button id="parseFileBtn" class="secondary" type="button" title="Ejecutar reconocimiento óptico de caracteres">Ejecutar OCR</button>
               </div>
-              <span class="field-hint">Soporta txt, csv, pdf y docx.</span>
+              <span class="field-hint">Soporta txt, csv, pdf, docx, jpg y png.</span>
             </div>
           </div>
         </div>
@@ -265,8 +267,8 @@
           <div class="docs-upload-inner">
             <svg class="docs-upload-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/></svg>
             <p class="docs-upload-label">Arrastra documentos aquí o <span class="docs-upload-link">haz clic para seleccionar</span></p>
-            <p class="docs-upload-hint">PDF, DOCX, TXT, CSV — hasta 20 MB por archivo</p>
-            <input id="docsFileInput" type="file" accept=".txt,.md,.json,.csv,.xml,.html,.pdf,.docx" multiple style="display:none">
+            <p class="docs-upload-hint">PDF, DOCX, TXT, CSV, JPG, PNG — hasta 20 MB por archivo</p>
+            <input id="docsFileInput" type="file" accept=".txt,.md,.json,.csv,.xml,.html,.pdf,.docx,.jpg,.jpeg,.png" multiple style="display:none">
           </div>
         </div>
 
@@ -516,8 +518,8 @@
           <div class="docs-upload-inner">
             <svg class="docs-upload-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/></svg>
             <p class="docs-upload-label"><span id="colUploadLabel">Arrastra archivos aquí o <span class="docs-upload-link">haz clic para seleccionar</span></span></p>
-            <p class="docs-upload-hint">PDF, DOCX, TXT, CSV — múltiples archivos</p>
-            <input id="colFileInput" type="file" accept=".txt,.md,.json,.csv,.xml,.html,.pdf,.docx" multiple style="display:none">
+            <p class="docs-upload-hint">PDF, DOCX, TXT, CSV, JPG, PNG — múltiples archivos</p>
+            <input id="colFileInput" type="file" accept=".txt,.md,.json,.csv,.xml,.html,.pdf,.docx,.jpg,.jpeg,.png" multiple style="display:none">
           </div>
         </div>
         </div>
@@ -712,6 +714,7 @@
         <div class="actions">
           <button id="createConfigBtn">Crear prompt</button>
           <button id="updateConfigBtn" class="secondary">Guardar cambios</button>
+          <button id="deleteConfigBtn" type="button" class="danger">Eliminar prompt</button>
           <button id="clearEditorBtn" class="secondary">Limpiar borrador</button>
         </div>
 
