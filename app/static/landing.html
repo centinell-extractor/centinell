@@ -21,6 +21,14 @@
   <meta name="twitter:description" content="Convierte facturas, contratos e informes en datos limpios y exportables con IA. Sin código, sin errores manuales.">
   <meta name="twitter:image" content="https://centinell.io/static/og-image.jpg">
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <!-- Google Analytics 4 -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-Q7PKF2QX1M"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-Q7PKF2QX1M');
+  </script>
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -703,11 +711,11 @@
       </p>
 
       <div class="hero-actions">
-        <a href="mailto:info@centinell.io?subject=Solicitud%20de%20acceso" class="btn btn-primary btn-primary-lg">
+        <a href="mailto:info@centinell.io?subject=Solicitud%20de%20acceso" class="btn btn-primary btn-primary-lg" onclick="gtag('event','cta_click',{cta_name:'solicita_info',cta_location:'hero'})">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4-8 5-8-5V6l8 5 8-5v2z"/></svg>
           Solicita información
         </a>
-        <a href="/app" class="btn-outline-lg btn">
+        <a href="/app" class="btn-outline-lg btn" onclick="gtag('event','cta_click',{cta_name:'accede',cta_location:'hero'})">
           Accede →
         </a>
       </div>
@@ -1011,11 +1019,11 @@
           Sin instalación, sin infraestructura propia.
         </p>
         <div class="finalcta-actions">
-          <a href="mailto:info@centinell.io?subject=Solicitud%20de%20acceso" class="btn-cta-white">
+          <a href="mailto:info@centinell.io?subject=Solicitud%20de%20acceso" class="btn-cta-white" onclick="gtag('event','cta_click',{cta_name:'solicita_info',cta_location:'final_cta'})">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4-8 5-8-5V6l8 5 8-5v2z"/></svg>
             Solicitar acceso
           </a>
-          <a href="/app" class="btn-outline-lg btn">
+          <a href="/app" class="btn-outline-lg btn" onclick="gtag('event','cta_click',{cta_name:'accede',cta_location:'final_cta'})">
             Ya tengo cuenta →
           </a>
         </div>
