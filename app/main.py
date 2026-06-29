@@ -148,6 +148,27 @@ async def favicon():
     return FileResponse(static_dir / "favicon.svg", media_type="image/svg+xml")
 
 
+@app.get("/robots.txt")
+async def robots_txt():
+    return Response(
+        content="User-agent: *\nAllow: /\nDisallow: /app\nDisallow: /api/\nSitemap: https://centinell.io/sitemap.xml\n",
+        media_type="text/plain",
+    )
+
+
+@app.get("/sitemap.xml")
+async def sitemap_xml():
+    content = """<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://centinell.io/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>1.0</priority>
+  </url>
+</urlset>"""
+    return Response(content=content, media_type="application/xml")
+
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     logger.exception(f"Error no controlado en {request.url.path}")
